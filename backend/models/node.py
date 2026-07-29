@@ -5,6 +5,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 class NodeStatus(str, Enum):
     PENDING = "pending"
+    READY = "ready"
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
