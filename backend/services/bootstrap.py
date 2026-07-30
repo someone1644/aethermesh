@@ -26,6 +26,9 @@ from services.gemini_client import GeminiClient
 from services.workflow_generator import WorkflowGenerator
 
 
+from runtime.event_logger import EventLogger
+
+
 def build_registry(gemini_client: GeminiClient) -> AgentRegistry:
     """
     Construct an :class:`AgentRegistry` with all agents wired to
@@ -52,6 +55,9 @@ def build_registry(gemini_client: GeminiClient) -> AgentRegistry:
 
 #: Shared Gemini SDK client.
 gemini_client: GeminiClient = GeminiClient()
+
+#: Shared EventLogger instance for logging and replay.
+event_logger: EventLogger = EventLogger()
 
 #: Agent registry pre-loaded with all Gemini-powered agents.
 registry: AgentRegistry = build_registry(gemini_client)

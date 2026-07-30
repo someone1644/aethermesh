@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Any
 from uuid import uuid4
@@ -15,7 +15,7 @@ class EventType(str, Enum):
     WORKFLOW_COMPLETED = "workflow_completed"
 class RuntimeEvent(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: EventType
     reason: str
     details: Dict[str, Any] = Field(default_factory=dict)

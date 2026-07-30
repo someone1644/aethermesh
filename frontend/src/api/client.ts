@@ -10,9 +10,14 @@ export async function getExecutionState(): Promise<ExecutionState> {
 
 export async function submitTask(task: string): Promise<ExecutionState> {
   if (USE_MOCKS) return { ...runningExecutionState, task }
-  return fetch(`${API_BASE}/execute`, {
+  const res = await fetch(`${API_BASE}/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ task }),
-  }).then((res) => res.json())
+  })
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.detail || `Execution request failed with status ${res.status}`)
+  }
+  return res.json()
 }

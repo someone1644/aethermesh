@@ -1,10 +1,9 @@
-
-
-from typing import Optional
+from __future__ import annotations
 
 from policies.base_policy import BasePolicy
-from models.execution_state import ExecutionState
-from models.runtime_decision import RuntimeDecision
+from models.execution import ExecutionState
+from models.runtime_decision import RuntimeDecision, DecisionAction
+from models.node import WorkflowNode
 
 
 class MissingRepoPolicy(BasePolicy):
@@ -12,14 +11,22 @@ class MissingRepoPolicy(BasePolicy):
 
     name = "MissingRepoPolicy"
 
-    def evaluate(self, state: ExecutionState) -> Optional[RuntimeDecision]:
-        if not state.repository_found:
+    def evaluate(self, state: ExecutionState) -> RuntimeDecision:
+        already_added = any(
+            n.metadata.get("reason") == "repository_search"
+            for n in state.workflow.nodes
+        )
+        if not state.repository_found and not already_added:
             return RuntimeDecision(
-                action="insert_node",
-                target_agent="ResearcherAgent",
-                node_type="repository_search",
+                action=DecisionAction.ADD,
+                new_node=WorkflowNode(
+                    name="Repository search",
+                    agent_type="researcher",
+                    metadata={"reason": "repository_search"},
+                ),
                 reason="No repository was located during execution.",
-                source_policy=self.name,
+                policy_name=self.name,
+                priority=3,
                 metadata={"repository_found": state.repository_found},
             )
-        return None
+        return RuntimeDecision(policy_name=self.name)

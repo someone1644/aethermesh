@@ -46,7 +46,7 @@ class ResearcherAgent(BaseAgent):
         task: str = node.metadata.get("task", node.name)
         domain: str = node.metadata.get("domain", "general problem-solving")
 
-        if self.gemini is None:
+        if self.gemini is None or not getattr(self.gemini, "has_api_key", True):
             return AgentResult(
                 answer="Research completed (no Gemini client).",
                 confidence=0.95,

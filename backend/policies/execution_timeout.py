@@ -1,11 +1,10 @@
-
+from __future__ import annotations
 
 from typing import Optional
 
 from policies.base_policy import BasePolicy
-from models.execution_state import ExecutionState
-from models.runtime_decision import RuntimeDecision
-import config
+from models.execution import ExecutionState
+from models.runtime_decision import RuntimeDecision, DecisionAction
 
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
@@ -19,23 +18,24 @@ class ExecutionTimeoutPolicy(BasePolicy):
         self.timeout_seconds = (
             timeout_seconds
             if timeout_seconds is not None
-            else getattr(config, "EXECUTION_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+            else DEFAULT_TIMEOUT_SECONDS
         )
 
-    def evaluate(self, state: ExecutionState) -> Optional[RuntimeDecision]:
-        if state.execution_time > self.timeout_seconds:
+    def evaluate(self, state: ExecutionState) -> RuntimeDecision:
+        # execution_time lives on state.metrics, not state directly
+        if state.metrics.execution_time > self.timeout_seconds:
             return RuntimeDecision(
-                action="skip_node",
-                target_agent=None,
-                node_type=None,
+                action=DecisionAction.REMOVE,
+                target_node=state.workflow.current_node,
                 reason=(
-                    f"Execution time {state.execution_time:.2f}s exceeded "
+                    f"Execution time {state.metrics.execution_time:.2f}s exceeded "
                     f"timeout of {self.timeout_seconds:.2f}s."
                 ),
-                source_policy=self.name,
+                policy_name=self.name,
+                priority=4,
                 metadata={
-                    "execution_time": state.execution_time,
+                    "execution_time": state.metrics.execution_time,
                     "timeout_seconds": self.timeout_seconds,
                 },
             )
-        return None
+        return RuntimeDecision(policy_name=self.name)

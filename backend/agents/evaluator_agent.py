@@ -51,7 +51,7 @@ class EvaluatorAgent(BaseAgent):
         domain: str = node.metadata.get("domain", "general problem-solving")
         artifact_type: str = node.metadata.get("artifact_type", "output")
 
-        if self.gemini is None:
+        if self.gemini is None or not getattr(self.gemini, "has_api_key", True):
             return AgentResult(
                 answer="Evaluation completed (no Gemini client).",
                 confidence=0.97,

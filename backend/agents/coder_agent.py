@@ -48,7 +48,7 @@ class CoderAgent(BaseAgent):
         domain: str = node.metadata.get("domain", "general problem-solving")
         artifact_type: str = node.metadata.get("artifact_type", "solution")
 
-        if self.gemini is None:
+        if self.gemini is None or not getattr(self.gemini, "has_api_key", True):
             return AgentResult(
                 answer="Output produced (no Gemini client).",
                 confidence=0.93,

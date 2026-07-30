@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
 from models.node import NodeStatus, WorkflowNode
@@ -13,6 +15,7 @@ class WorkflowEdge(BaseModel):
 
 
 class Workflow(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
 
     nodes: List[WorkflowNode] = Field(default_factory=list)
 

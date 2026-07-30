@@ -1,9 +1,9 @@
-
-from typing import Optional
+from __future__ import annotations
 
 from policies.base_policy import BasePolicy
-from models.execution_state import ExecutionState
-from models.runtime_decision import RuntimeDecision
+from models.execution import ExecutionState
+from models.runtime_decision import RuntimeDecision, DecisionAction
+from models.node import WorkflowNode
 
 CONFIDENCE_THRESHOLD = 0.4
 
@@ -13,20 +13,28 @@ class LowConfidencePolicy(BasePolicy):
 
     name = "LowConfidencePolicy"
 
-    def evaluate(self, state: ExecutionState) -> Optional[RuntimeDecision]:
-        if state.confidence < CONFIDENCE_THRESHOLD:
+    def evaluate(self, state: ExecutionState) -> RuntimeDecision:
+        already_added = any(
+            n.metadata.get("reason") == "confidence_boost"
+            for n in state.workflow.nodes
+        )
+        if state.metrics.completed_agents > 0 and state.confidence < CONFIDENCE_THRESHOLD and not already_added:
             return RuntimeDecision(
-                action="insert_node",
-                target_agent="ResearcherAgent",
-                node_type="researcher",
+                action=DecisionAction.ADD,
+                new_node=WorkflowNode(
+                    name="Extra research (low confidence)",
+                    agent_type="researcher",
+                    metadata={"reason": "confidence_boost"},
+                ),
                 reason=(
                     f"Confidence {state.confidence:.2f} is below the "
                     f"required threshold of {CONFIDENCE_THRESHOLD:.2f}."
                 ),
-                source_policy=self.name,
+                policy_name=self.name,
+                priority=2,
                 metadata={
                     "confidence": state.confidence,
                     "threshold": CONFIDENCE_THRESHOLD,
                 },
             )
-        return None
+        return RuntimeDecision(policy_name=self.name)

@@ -1,5 +1,12 @@
-node_modules
-dist
-dist-ssr
-*.local
-.DS_Store
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+.env
+.env.*
+
+.venv/
+venv/
+
+.pytest_cache/
