@@ -2,57 +2,70 @@ import type { NodeStatus, WorkflowNode } from '../../types/workflow'
 
 const STATUS_STYLES: Record<
   NodeStatus,
-  { bg: string; border: string; text: string; pulse?: boolean; dashed?: boolean }
+  { border: string; text: string; bg: string; pulse?: boolean; dashed?: boolean }
 > = {
-  pending: { bg: '#F3F4F6', border: '#D1D5DB', text: '#6B7280' },
-  ready: { bg: '#F3F4F6', border: '#9CA3AF', text: '#4B5563' },
-  active: { bg: '#FEF3E2', border: '#D97706', text: '#B45309', pulse: true },
-  completed: { bg: '#E7F6EC', border: '#1E8E3E', text: '#166534' },
-  failed: { bg: '#FDECEA', border: '#D93025', text: '#B91C1C' },
-  skipped: { bg: '#F3F4F6', border: '#D1D5DB', text: '#9CA3AF', dashed: true },
+  pending: { border: '#D1D5DB', text: '#6B7280', bg: '#F3F4F6' },
+  ready: { border: '#9CA3AF', text: '#4B5563', bg: '#F3F4F6' },
+  active: { border: '#D97706', text: '#B45309', bg: '#FEF3E2', pulse: true },
+  completed: { border: '#1E8E3E', text: '#166534', bg: '#E7F6EC' },
+  failed: { border: '#D93025', text: '#B91C1C', bg: '#FDECEA' },
+  skipped: { border: '#D1D5DB', text: '#9CA3AF', bg: '#F3F4F6', dashed: true },
+}
+
+const STATUS_LABEL: Record<NodeStatus, string> = {
+  pending: 'Pending',
+  ready: 'Ready',
+  active: 'Active',
+  completed: 'Completed',
+  failed: 'Failed',
+  skipped: 'Skipped',
+}
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  planner: 'Plans the execution workflow',
+  researcher: 'Gathers supporting evidence',
+  coder: 'Implements the fix',
+  reviewer: 'Reviews the proposed change',
+  evaluator: 'Scores final confidence',
 }
 
 function AgentNode({ node }: { node: WorkflowNode }) {
   const style = STATUS_STYLES[node.status]
+  const role = ROLE_DESCRIPTIONS[node.agent_type] ?? node.agent_type
   return (
     <div
-      className={`flex h-[90px] w-[180px] shrink-0 flex-col justify-center gap-1 rounded-xl border bg-white px-3.5 py-3 text-left shadow-sm ${style.pulse ? 'node-pulse' : ''}`}
+      className={`relative w-[210px] shrink-0 rounded-[10px] border bg-white px-4 pb-8 pt-6 text-left shadow-sm ${style.pulse ? 'node-pulse' : ''}`}
       style={{ borderColor: style.border, borderStyle: style.dashed ? 'dashed' : 'solid' }}
     >
       <span
-        className="inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wide"
-        style={{ backgroundColor: style.bg, color: style.text }}
+        className="absolute -top-2.5 left-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium shadow-sm"
+        style={{ backgroundColor: style.bg, borderColor: style.border, color: style.text }}
       >
-        Agent
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: style.text }} />
+        {STATUS_LABEL[node.status]}
       </span>
       <div className="truncate text-sm font-semibold text-[var(--color-text)]">{node.name}</div>
-      <div className="truncate font-mono text-[10px] uppercase tracking-wider" style={{ color: style.text }}>
-        {node.status}
-      </div>
+      <div className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{role}</div>
     </div>
   )
 }
 
 function Connector({ active }: { active: boolean }) {
-  const color = active ? '#D97706' : '#E5E5E5'
+  const color = active ? '#D97706' : '#D1D5DB'
   return (
-    <div className="relative flex min-w-[40px] flex-1 items-center px-1">
-      <svg width="100%" height="4" preserveAspectRatio="none" className="block">
-        <line
-          x1="0"
-          y1="2"
-          x2="100%"
-          y2="2"
+    <div className="flex h-10 min-w-[36px] flex-1 items-center">
+      <svg width="100%" height="40" viewBox="0 0 100 40" preserveAspectRatio="none" className="block overflow-visible">
+        <path
+          d="M0,20 C30,12 70,28 100,20"
+          fill="none"
           stroke={color}
-          strokeWidth={active ? 2 : 1.5}
+          strokeWidth={active ? 2 : 1.2}
+          strokeOpacity={active ? 1 : 0.6}
           strokeDasharray={active ? '6 4' : undefined}
+          vectorEffect="non-scaling-stroke"
           className={active ? 'connector-flow' : undefined}
         />
       </svg>
-      <span
-        className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white"
-        style={{ borderColor: color }}
-      />
     </div>
   )
 }
@@ -66,7 +79,7 @@ export default function AgentFlowDiagram({
 }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-      <div className="flex items-center overflow-x-auto">
+      <div className="flex items-center overflow-x-auto pt-2.5">
         {nodes.map((node, i) => (
           <div key={node.id} className="flex items-center">
             <AgentNode node={node} />
