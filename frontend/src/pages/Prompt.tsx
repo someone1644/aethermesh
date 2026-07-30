@@ -17,6 +17,12 @@ const SUGGESTIONS = [
   'Find and fix the flakiest test in the suite',
   "Audit last week's failed deploys for root cause",
   'Draft a rollback plan for the payments service',
+  'Trace a memory leak in the ingestion service',
+  'Reconcile mismatched inventory counts across warehouses',
+  'Explain why the nightly ETL job silently dropped rows',
+  'Compare two API response schemas for breaking changes',
+  'Identify the root cause of a spike in 5xx errors',
+  'Validate a database migration against staging data',
 ]
 
 export default function Prompt() {
