@@ -24,6 +24,8 @@ _KNOWN_AGENT_TYPES = [
     "security_auditor",
     "optimizer",
     "sandbox_runner",
+    "summarizer",
+    "analyst",
 ]
 
 # ---------------------------------------------------------------------------

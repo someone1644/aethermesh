@@ -16,7 +16,9 @@ Usage (e.g. from an API route or lifespan handler)::
     engine.execute(state)
 """
 
+from agents.analyst_agent import AnalystAgent
 from agents.coder_agent import CoderAgent
+from agents.summarizer_agent import SummarizerAgent
 from agents.debugger_agent import DebuggerAgent
 from agents.evaluator_agent import EvaluatorAgent
 from agents.optimizer_agent import OptimizerAgent
@@ -48,6 +50,8 @@ def build_registry(gemini_client: GeminiClient) -> AgentRegistry:
     reg.register("security_auditor", SecurityAuditorAgent())
     reg.register("optimizer",        OptimizerAgent())
     reg.register("sandbox_runner",   SandboxRunnerAgent())
+    reg.register("summarizer",        SummarizerAgent())
+    reg.register("analyst",           AnalystAgent())
     return reg
 
 
