@@ -58,10 +58,27 @@ export function applyEventToWorkflow(workflow: Workflow, event: RuntimeEvent): W
         history: workflow.history.includes(id) ? workflow.history : [...workflow.history, id],
       }
     }
+    case 'node_added': {
+      const id = event.details.node_id as string
+      if (!id || workflow.nodes.some((n) => n.id === id)) return workflow
+      const name = (event.details.name as string) || 'New step'
+      const agentType = (event.details.agent_type as string) || 'planner'
+      const newNode = makeNode(id, name, agentType, 'ready')
+      const lastId = workflow.nodes[workflow.nodes.length - 1]?.id
+      return {
+        ...workflow,
+        nodes: [...workflow.nodes, newNode],
+        edges: lastId ? [...workflow.edges, { source: lastId, target: id }] : workflow.edges,
+      }
+    }
     case 'node_replaced': {
       const oldId = event.details.old_node as string
       const newId = event.details.new_node as string
-      const base = REPLACEMENT_NODE_POOL.find((n) => n.id === newId)
+      const name = event.details.name as string | undefined
+      const agentType = event.details.agent_type as string | undefined
+      const base =
+        REPLACEMENT_NODE_POOL.find((n) => n.id === newId) ??
+        (name && agentType ? makeNode(newId, name, agentType, 'ready') : undefined)
       if (!base) return workflow
       return {
         ...workflow,
@@ -73,11 +90,12 @@ export function applyEventToWorkflow(workflow: Workflow, event: RuntimeEvent): W
       }
     }
     case 'node_removed': {
+      // A removed node was bypassed, not failed — keep it (and its edges)
+      // visible in the diagram as 'skipped' rather than deleting it outright.
       const id = event.details.node_id as string
       return {
         ...workflow,
-        nodes: workflow.nodes.filter((n) => n.id !== id),
-        edges: workflow.edges.filter((e) => e.source !== id && e.target !== id),
+        nodes: workflow.nodes.map((n) => (n.id === id ? { ...n, status: 'skipped' } : n)),
       }
     }
     default:

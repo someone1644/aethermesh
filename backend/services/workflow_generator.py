@@ -45,6 +45,9 @@ Guidelines:
 - Include a "reviewer" node to quality-check the artifact.
 - End with an "evaluator" node to score the final result.
 - Keep the sequence logical and minimal — avoid redundant nodes.
+- Name each node after its role, not its action: "Planner", "Researcher",
+  "Coder", "Reviewer", "Evaluator" (if there are multiple nodes of the same
+  agent_type, number them, e.g. "Coder 2").
 
 Respond in this exact format:
 DOMAIN: <domain string>
@@ -209,11 +212,11 @@ class WorkflowGenerator:
             "task": task,
         }
         nodes = [
-            WorkflowNode(name="Plan task",          agent_type="planner",    metadata=dict(base_meta)),
-            WorkflowNode(name="Research context",   agent_type="researcher", metadata=dict(base_meta)),
-            WorkflowNode(name="Produce solution",   agent_type="coder",      metadata=dict(base_meta)),
-            WorkflowNode(name="Review work",        agent_type="reviewer",   metadata=dict(base_meta)),
-            WorkflowNode(name="Evaluate result",    agent_type="evaluator",  metadata=dict(base_meta)),
+            WorkflowNode(name="Planner",    agent_type="planner",    metadata=dict(base_meta)),
+            WorkflowNode(name="Researcher", agent_type="researcher", metadata=dict(base_meta)),
+            WorkflowNode(name="Coder",      agent_type="coder",      metadata=dict(base_meta)),
+            WorkflowNode(name="Reviewer",   agent_type="reviewer",   metadata=dict(base_meta)),
+            WorkflowNode(name="Evaluator",  agent_type="evaluator",  metadata=dict(base_meta)),
         ]
         prev: Optional[str] = None
         for node in nodes:

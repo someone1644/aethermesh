@@ -10,10 +10,12 @@ from sse_starlette.sse import EventSourceResponse
 
 from api.schemas import HealthResponse, TaskRequest
 from config import settings
-from models.execution import ExecutionState
+from models.event import EventType, RuntimeEvent
+from models.execution import ExecutionState, ExecutionStatus
 from runtime.engine import RuntimeEngine
 from runtime.policy_engine import PolicyEngine
 from runtime.replay import ReplayReader
+from runtime.workflow_graph import to_node_link_data
 from services.bootstrap import (
     event_logger,
     gemini_client,
@@ -31,6 +33,43 @@ from policies import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# In-memory registry of executions started via /execute/start, keyed by
+# workflow_id, so /execute/{id}/stream and /execute/{id} can find them.
+# Same lifetime tradeoff as EventLogger's in-memory store: fine for a
+# single-process dev/demo deployment, not meant to survive a restart.
+_running_states: dict[str, ExecutionState] = {}
+
+
+def _build_policy_engine() -> PolicyEngine:
+    return PolicyEngine(
+        policies=[
+            LowConfidencePolicy(),
+            MissingRepoPolicy(),
+            ContradictionPolicy(),
+            LowSourcesPolicy(),
+            ExecutionTimeoutPolicy(),
+        ]
+    )
+
+
+def _state_snapshot(state: ExecutionState) -> dict:
+    return {
+        "status": state.status.value,
+        "confidence": state.confidence,
+        "final_output": state.final_output,
+        "repository_found": state.repository_found,
+        "contradiction_score": state.contradiction_score,
+        "sources": state.sources,
+        "metrics": state.metrics.model_dump(mode="json"),
+    }
+
+
+def _stream_payload(event: RuntimeEvent, state: ExecutionState) -> dict:
+    return {
+        "event": event.model_dump(mode="json"),
+        "state": _state_snapshot(state),
+    }
 
 # -----------------------------------------------------------------------
 # Health / info
@@ -77,15 +116,7 @@ async def execute_task(body: TaskRequest):
         state = ExecutionState(task=task, workflow=workflow)
 
         # 3. Assemble policy engine with all registered policies
-        policy_engine = PolicyEngine(
-            policies=[
-                LowConfidencePolicy(),
-                MissingRepoPolicy(),
-                ContradictionPolicy(),
-                LowSourcesPolicy(),
-                ExecutionTimeoutPolicy(),
-            ]
-        )
+        policy_engine = _build_policy_engine()
 
         # 4. Build runtime engine with shared event logger
         engine = RuntimeEngine(
@@ -145,18 +176,126 @@ async def get_replay(workflow_id: str):
 
 
 # -----------------------------------------------------------------------
-# SSE event stream
+# Workflow graph
 # -----------------------------------------------------------------------
 
 
-@router.get("/events/stream")
-async def event_stream():
+@router.get("/workflow/{workflow_id}/graph")
+async def get_workflow_graph(workflow_id: str):
     """
-    Server-Sent Events endpoint.
-    Streams runtime events to the frontend for live visualization.
+    Node-link representation (networkx.node_link_data) of a workflow's
+    graph, built from the same Workflow.nodes/edges the runtime itself
+    executes against — so this stays consistent with actual execution
+    order by construction rather than being a separately-maintained view.
     """
+    state = _running_states.get(workflow_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Unknown workflow_id.")
+    return to_node_link_data(state.workflow)
+
+
+# -----------------------------------------------------------------------
+# Live execution (start + SSE stream)
+# -----------------------------------------------------------------------
+
+
+@router.post("/execute/start")
+async def start_execute(body: TaskRequest):
+    """
+    Generate a workflow and kick off execution in the background,
+    returning immediately with the workflow_id and initial (all-pending)
+    workflow so the caller can seed a live view before subscribing to
+    /execute/{workflow_id}/stream.
+    """
+    task = body.task.strip()
+    if not task:
+        raise HTTPException(status_code=400, detail="Task must not be empty.")
+
+    workflow = workflow_generator.generate(task)
+    state = ExecutionState(task=task, workflow=workflow)
+    _running_states[workflow.id] = state
+
+    engine = RuntimeEngine(
+        policy_engine=_build_policy_engine(),
+        registry=registry,
+        event_logger=event_logger,
+    )
+
+    async def _run() -> None:
+        try:
+            await asyncio.to_thread(engine.execute, state)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Background execution failed for workflow_id=%r", workflow.id
+            )
+            state.status = ExecutionStatus.FAILED
+            state.final_output = state.final_output or f"Execution failed: {exc}"
+            event_logger.log(
+                state,
+                EventType.WORKFLOW_COMPLETED,
+                "Workflow execution failed.",
+            )
+
+    asyncio.create_task(_run())
+
+    return {
+        "workflow_id": workflow.id,
+        "workflow": workflow.model_dump(mode="json"),
+    }
+
+
+@router.get("/execute/{workflow_id}/stream")
+async def stream_execute(workflow_id: str):
+    """
+    Server-Sent Events endpoint for an execution started via /execute/start.
+    Replays any events already logged, then streams new ones live until
+    workflow_completed, at which point the stream closes.
+    """
+    state = _running_states.get(workflow_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Unknown workflow_id.")
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def on_event(event: RuntimeEvent) -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, _stream_payload(event, state))
+
+    # Register the listener BEFORE snapshotting state.events. Doing it the
+    # other way round leaves a gap where an event logged between the
+    # snapshot and registration is neither in the snapshot nor delivered
+    # live — silently dropped (this is what was swallowing the first
+    # agent_started event, making nodes appear to jump straight from
+    # pending to completed). Registering first can instead double-deliver
+    # an event logged in that same narrow window, so de-dupe by id below.
+    event_logger.add_listener(workflow_id, on_event)
+    caught_up = list(state.events)
+    seen_ids = {event.id for event in caught_up}
 
     async def _generate() -> AsyncGenerator[dict, None]:
-        yield {"data": json.dumps({"event_type": "connected", "reason": "SSE stream ready"})}
+        try:
+            for event in caught_up:
+                yield {"data": json.dumps(_stream_payload(event, state))}
+                if event.event_type == EventType.WORKFLOW_COMPLETED:
+                    return
+
+            while True:
+                payload = await queue.get()
+                if payload["event"]["id"] in seen_ids:
+                    continue
+                yield {"data": json.dumps(payload)}
+                if payload["event"]["event_type"] == EventType.WORKFLOW_COMPLETED.value:
+                    break
+        finally:
+            event_logger.remove_listener(workflow_id, on_event)
 
     return EventSourceResponse(_generate())
+
+
+@router.get("/execute/{workflow_id}")
+async def get_execute_state(workflow_id: str):
+    """Poll the current (or final) ExecutionState for a background run."""
+    state = _running_states.get(workflow_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Unknown workflow_id.")
+    return state.model_dump(mode="json")

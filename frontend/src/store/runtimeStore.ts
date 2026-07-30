@@ -8,6 +8,7 @@ interface RuntimeStore {
   executionState: ExecutionState
   isLive: boolean
   setExecutionState: (state: ExecutionState) => void
+  patchExecutionState: (patch: Partial<ExecutionState>) => void
   appendEvent: (event: RuntimeEvent) => void
   setLive: (live: boolean) => void
 }
@@ -16,6 +17,8 @@ export const useRuntimeStore = create<RuntimeStore>((set) => ({
   executionState: completedExecutionState,
   isLive: false,
   setExecutionState: (state) => set({ executionState: state }),
+  patchExecutionState: (patch) =>
+    set((s) => ({ executionState: { ...s.executionState, ...patch } })),
   appendEvent: (event) =>
     set((s) => ({
       executionState: {

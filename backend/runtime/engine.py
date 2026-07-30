@@ -10,6 +10,7 @@ from agents.registry import AgentRegistry
 from config import settings
 
 from models.agent_result import AgentResult
+from models.event import EventType
 from models.execution import ExecutionState
 from models.node import WorkflowNode
 from models.runtime_decision import DecisionAction
@@ -19,6 +20,7 @@ from runtime.event_logger import EventLogger
 from runtime.mutation_engine import MutationEngine
 from runtime.policy_engine import PolicyEngine
 from runtime.state_manager import StateManager
+from runtime.workflow_graph import next_ready_node
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +61,16 @@ class RuntimeEngine:
 
         while workflow.has_next():
 
-            node = workflow.get_next_node()
+            # Graph-aware selection: the next PENDING/READY node in
+            # topological order (networkx), not just list position — same
+            # result as before for today's linear workflows, but correct
+            # if a workflow ever branches.
+            node = next_ready_node(workflow)
 
             if node is None:
                 break
+
+            workflow.current_node = node.id
 
             if delay_s > 0:
                 time.sleep(delay_s)
@@ -92,6 +100,7 @@ class RuntimeEngine:
                     prepared.id,
                     prepared.agent_type,
                     confidence=0.0,
+                    failed=True,
                 )
                 continue
 
@@ -214,6 +223,8 @@ class RuntimeEngine:
                     self.logger.node_added(
                         state,
                         decision.new_node.id,
+                        name=decision.new_node.name,
+                        agent_type=decision.new_node.agent_type,
                     )
 
                 elif decision.action == DecisionAction.REMOVE:
@@ -229,4 +240,26 @@ class RuntimeEngine:
                         state,
                         decision.target_node,
                         decision.new_node.id,
+                        name=decision.new_node.name,
+                        agent_type=decision.new_node.agent_type,
                     )
+
+            else:
+
+                # MutationEngine rejects a mutation that would leave the
+                # workflow graph with a cycle (or is otherwise malformed) —
+                # don't silently drop it, record why.
+                self.logger.log(
+                    state,
+                    EventType.POLICY_TRIGGERED,
+                    (
+                        f"Mutation rejected — applying it would break the "
+                        f"workflow graph (policy={decision.policy_name}, "
+                        f"action={decision.action.value})."
+                    ),
+                    {
+                        "policy": decision.policy_name,
+                        "action": decision.action.value,
+                        "rejected": True,
+                    },
+                )
