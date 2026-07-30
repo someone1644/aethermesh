@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RuntimeEvent } from '../types/event'
+import type { Workflow } from '../types/workflow'
 import { reconstructUpTo } from '../lib/workflowEvents'
 
-export function useReplay(events: RuntimeEvent[]) {
+export function useReplay(events: RuntimeEvent[], baseWorkflow?: Workflow) {
   const [index, setIndex] = useState(Math.max(events.length - 1, 0))
   const [playing, setPlaying] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -34,7 +35,10 @@ export function useReplay(events: RuntimeEvent[]) {
     [events.length],
   )
 
-  const workflowAtIndex = useMemo(() => reconstructUpTo(events, index), [events, index])
+  const workflowAtIndex = useMemo(
+    () => reconstructUpTo(events, index, baseWorkflow),
+    [events, index, baseWorkflow],
+  )
   const visibleEvents = useMemo(() => events.slice(0, index + 1), [events, index])
 
   return {

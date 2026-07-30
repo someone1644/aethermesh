@@ -78,12 +78,43 @@ const POLICIES: { key: string; name: string; description: string; Icon: () => Re
   },
 ]
 
-/**
- * Static policy design cards. Backend policy implementations are stubs today, so this
- * intentionally doesn't wire up live RuntimeDecision data — `decisions` is accepted only
- * for backward compatibility with older call sites and is currently unused.
- */
-export default function DecisionPanel(_props: { decisions?: RuntimeDecision[] } = {}) {
+const ACTION_LABEL: Record<string, string> = {
+  add: 'Added node',
+  remove: 'Removed node',
+  replace: 'Replaced node',
+  none: 'No action',
+}
+
+function LiveDecisions({ decisions }: { decisions: RuntimeDecision[] }) {
+  return (
+    <div className="space-y-3">
+      {decisions.map((d, i) => (
+        <div
+          key={`${d.policy_name}-${i}`}
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+        >
+          <div className="flex items-center justify-between gap-2.5">
+            <span className="font-mono text-sm font-medium text-[var(--color-text)]">{d.policy_name}</span>
+            <span className="font-mono text-xs uppercase tracking-wide text-[var(--color-accent)]">
+              {ACTION_LABEL[d.action] ?? d.action}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{d.reason}</p>
+          {(d.target_node || d.new_node) && (
+            <p className="mt-1 font-mono text-xs text-[var(--color-text-muted)]">
+              {d.target_node ? `target: ${d.target_node}` : ''}
+              {d.target_node && d.new_node ? ' · ' : ''}
+              {d.new_node ? `new: ${d.new_node}` : ''}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Reference cards describing each policy the backend's PolicyEngine evaluates. */
+function PolicyReference() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {POLICIES.map(({ key, name, description, Icon }) => (
@@ -102,4 +133,17 @@ export default function DecisionPanel(_props: { decisions?: RuntimeDecision[] } 
       ))}
     </div>
   )
+}
+
+/**
+ * Renders live RuntimeDecisions from the backend's PolicyEngine when a run has
+ * produced any (derived from `policy_triggered`/`node_*` events). Falls back to
+ * a static reference of the policies AetherMesh evaluates when none exist yet
+ * (idle state, or a run that didn't trigger any policy).
+ */
+export default function DecisionPanel({ decisions }: { decisions?: RuntimeDecision[] } = {}) {
+  if (decisions && decisions.length > 0) {
+    return <LiveDecisions decisions={decisions} />
+  }
+  return <PolicyReference />
 }

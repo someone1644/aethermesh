@@ -1,12 +1,18 @@
+import { useMemo } from 'react'
 import { useRuntime } from '../hooks/useRuntime'
 import { useReplay } from '../hooks/useReplay'
+import { buildReplaySkeleton } from '../lib/workflowEvents'
 import ReplayPanel from '../components/sidebar/ReplayPanel'
 import EventLog from '../components/sidebar/EventLog'
 import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 
 export default function Replay() {
   const { executionState } = useRuntime()
-  const replay = useReplay(executionState.events)
+  const skeleton = useMemo(
+    () => buildReplaySkeleton(executionState.workflow),
+    [executionState.workflow],
+  )
+  const replay = useReplay(executionState.events, skeleton)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">

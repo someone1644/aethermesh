@@ -1,45 +1,23 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Optional
 
 from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 from models.node import WorkflowNode
-from services.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Prompt template — {domain} and {artifact_type} injected at call time
-# ---------------------------------------------------------------------------
-_SYSTEM_TEMPLATE = """\
-You are an objective quality evaluator specialising in {domain}.
-Your job is to holistically score the final {artifact_type} produced by an agent workflow,
-applying the quality standards of the {domain} field.
-
-Respond in this exact format:
-SCORE: <float between 0.0 (completely wrong/useless) and 1.0 (perfect)>
-COMPLETENESS: <float between 0.0 and 1.0>
-CORRECTNESS: <float between 0.0 and 1.0>
-CLARITY: <float between 0.0 and 1.0>
-FEEDBACK: <one concise paragraph with actionable observations for {domain}>
-CONFIDENCE: <float between 0.0 and 1.0>
-
-Rules:
-- Apply {domain}-specific quality criteria when scoring.
-- Be objective and evidence-based.
-- Do NOT add any text outside the format above.
-"""
-
 
 class EvaluatorAgent(BaseAgent):
+    """Scores artifacts locally using heuristic metrics."""
+
     def __init__(
         self,
-        gemini_client: Optional[GeminiClient] = None,
+        gemini_client: Optional[object] = None,
     ) -> None:
-        super().__init__("evaluator", gemini_client)
+        super().__init__("evaluator", None)
 
     def run(
         self,
@@ -50,93 +28,50 @@ class EvaluatorAgent(BaseAgent):
         )
         domain: str = node.metadata.get("domain", "general problem-solving")
         artifact_type: str = node.metadata.get("artifact_type", "output")
+        shared = node.metadata.get("shared_context", {})
 
-        if self.gemini is None or not getattr(self.gemini, "has_api_key", True):
-            return AgentResult(
-                answer="Evaluation completed (no Gemini client).",
-                confidence=0.97,
-                metadata={
-                    "domain": domain,
-                    "artifact_type": artifact_type,
-                    "node_id": node.id,
-                },
-            )
-
-        system = _SYSTEM_TEMPLATE.format(
-            domain=domain,
-            artifact_type=artifact_type,
-        )
-        prompt = (
-            f"{system}\n\n"
-            f"Output to evaluate:\n{artifact}\n"
-            f"Node metadata: {node.metadata}"
+        score, completeness, correctness, clarity = _score_artifact(
+            artifact, shared
         )
 
-        try:
-            raw = self.gemini.generate(prompt, temperature=0.1)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("EvaluatorAgent Gemini call failed: %s", exc)
-            return AgentResult(
-                answer=f"Evaluation failed: {exc}",
-                confidence=0.0,
-                metadata={"error": str(exc), "domain": domain},
-            )
-
-        parse_errors: list[str] = []
-
-        score        = _parse_required_float(raw, "SCORE",        node.id, parse_errors)
-        confidence   = _parse_required_float(raw, "CONFIDENCE",   node.id, parse_errors)
-        completeness = _parse_required_float(raw, "COMPLETENESS", node.id, parse_errors)
-        correctness  = _parse_required_float(raw, "CORRECTNESS",  node.id, parse_errors)
-        clarity      = _parse_required_float(raw, "CLARITY",      node.id, parse_errors)
+        raw = (
+            f"SCORE: {score:.2f}\n"
+            f"COMPLETENESS: {completeness:.2f}\n"
+            f"CORRECTNESS: {correctness:.2f}\n"
+            f"CLARITY: {clarity:.2f}\n"
+            f"FEEDBACK: Local evaluation for {domain} {artifact_type}. "
+            "Scores reflect structure, length, and use of shared planner/research context.\n"
+            "CONFIDENCE: 0.80"
+        )
 
         return AgentResult(
             answer=raw,
-            confidence=confidence if confidence is not None else 0.0,
+            confidence=0.80,
             metadata={
-                "score":         score,
-                "completeness":  completeness,
-                "correctness":   correctness,
-                "clarity":       clarity,
-                "domain":        domain,
+                "score": score,
+                "completeness": completeness,
+                "correctness": correctness,
+                "clarity": clarity,
+                "domain": domain,
                 "artifact_type": artifact_type,
-                "node_id":       node.id,
-                "parse_errors":  parse_errors,
+                "node_id": node.id,
+                "local_fallback": True,
             },
         )
 
 
-# ---------------------------------------------------------------------------
-# Parse helpers
-# ---------------------------------------------------------------------------
+def _score_artifact(
+    artifact: str,
+    shared: dict,
+) -> tuple[float, float, float, float]:
+    text = (artifact or "").strip()
+    length_score = min(1.0, len(text) / 400.0)
+    has_plan = bool(shared.get("planner"))
+    has_research = bool(shared.get("researcher"))
+    context_bonus = 0.1 * int(has_plan) + 0.1 * int(has_research)
 
-def _parse_float(text: str, key: str) -> Optional[float]:
-    """
-    Return the parsed float for *key* in *text*, or ``None`` if the key
-    is absent or the value cannot be converted.
-    """
-    m = re.search(rf"{key}:\s*([\d.]+)", text, re.IGNORECASE)
-    if m:
-        try:
-            return max(0.0, min(1.0, float(m.group(1))))
-        except ValueError:
-            pass
-    return None
-
-
-def _parse_required_float(
-    text: str,
-    key: str,
-    node_id: str,
-    errors: list[str],
-) -> Optional[float]:
-    """
-    Like :func:`_parse_float` but appends a warning to *errors* and logs
-    it when the key is missing so the caller has full visibility.
-    """
-    value = _parse_float(text, key)
-    if value is None:
-        msg = f"EvaluatorAgent: '{key}' not found in model response (node={node_id})"
-        logger.warning(msg)
-        errors.append(msg)
-    return value
+    completeness = min(1.0, length_score * 0.7 + context_bonus + 0.1)
+    correctness = 0.75 if "TODO" not in text else 0.45
+    clarity = 0.80 if ("##" in text or "OUTPUT:" in text) else 0.55
+    score = round((completeness + correctness + clarity) / 3.0, 2)
+    return score, round(completeness, 2), round(correctness, 2), round(clarity, 2)

@@ -85,10 +85,26 @@ export function applyEventToWorkflow(workflow: Workflow, event: RuntimeEvent): W
   }
 }
 
-export function foldEvents(events: RuntimeEvent[]): Workflow {
-  return events.reduce(applyEventToWorkflow, initialWorkflow)
+export function foldEvents(events: RuntimeEvent[], base: Workflow = initialWorkflow): Workflow {
+  return events.reduce(applyEventToWorkflow, base)
 }
 
-export function reconstructUpTo(events: RuntimeEvent[], uptoIndex: number): Workflow {
-  return foldEvents(events.slice(0, uptoIndex + 1))
+export function reconstructUpTo(events: RuntimeEvent[], uptoIndex: number, base?: Workflow): Workflow {
+  return foldEvents(events.slice(0, uptoIndex + 1), base)
+}
+
+/**
+ * Replay skeleton for a real (non-mock) run: the backend only returns the final
+ * workflow snapshot, not per-step history, so we reset every node's status to
+ * 'pending' and replay real event node_ids against it. Nodes removed mid-run
+ * won't appear in earlier frames since they're already absent from the final
+ * workflow — an accepted simplification given the current event payload.
+ */
+export function buildReplaySkeleton(finalWorkflow: Workflow): Workflow {
+  return {
+    nodes: finalWorkflow.nodes.map((n) => ({ ...n, status: 'pending' })),
+    edges: finalWorkflow.edges,
+    current_node: null,
+    history: [],
+  }
 }

@@ -61,12 +61,48 @@ const AboutIcon = () => (
   </IconShell>
 )
 
+const LogsIcon = () => (
+  <IconShell>
+    <path d="M4 4h16v16H4z" />
+    <path d="M7 9h10M7 13h10M7 17h6" />
+  </IconShell>
+)
+
+const TimelineIcon = () => (
+  <IconShell>
+    <path d="M4 12h16" />
+    <circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="13" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  </IconShell>
+)
+
+const GraphIcon = () => (
+  <IconShell>
+    <circle cx="5" cy="6" r="2" />
+    <circle cx="19" cy="6" r="2" />
+    <circle cx="12" cy="18" r="2" />
+    <path d="M6.7 7.3 10.5 16M17.3 7.3 13.5 16M7 6h10" />
+  </IconShell>
+)
+
+const ReplayIcon = () => (
+  <IconShell>
+    <path d="M3 11a9 9 0 1 1 2.6 6.4" />
+    <path d="M3 17v-5h5" />
+  </IconShell>
+)
+
 const NAV_ITEMS: { to: string; label: string; Icon: () => ReactNode; end?: boolean }[] = [
   { to: '/', label: 'Dashboard', Icon: DashboardIcon, end: true },
   { to: '/prompt', label: 'Prompt', Icon: PromptIcon },
   { to: '/run', label: 'Run', Icon: RunIcon },
   { to: '/runs', label: 'Past runs', Icon: PastRunsIcon },
   { to: '/policy', label: 'Policy', Icon: PolicyIcon },
+  { to: '/logs', label: 'Logs', Icon: LogsIcon },
+  { to: '/timeline', label: 'Timeline', Icon: TimelineIcon },
+  { to: '/graph', label: 'Workflow graph', Icon: GraphIcon },
+  { to: '/replay', label: 'Replay', Icon: ReplayIcon },
   { to: '/about', label: 'About', Icon: AboutIcon },
 ]
 

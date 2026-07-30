@@ -1,49 +1,23 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Optional
 
 from agents.base_agent import BaseAgent
 from models.agent_result import AgentResult
 from models.node import WorkflowNode
-from services.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Prompt template — {domain} and {artifact_type} injected at call time
-# ---------------------------------------------------------------------------
-_SYSTEM_TEMPLATE = """\
-You are a rigorous quality reviewer specialising in {domain}.
-Your job is to critically assess the provided {artifact_type} and identify
-any issues, gaps, or improvements needed — applying the standards of the {domain} field.
-
-Respond in this exact format:
-VERDICT: <APPROVE | REQUEST_CHANGES>
-ISSUES:
-- <specific issue 1, or "None" if there are no issues>
-- <specific issue 2>
-...
-SUGGESTIONS:
-- <actionable suggestion 1, or "None">
-...
-CONFIDENCE: <float between 0.0 and 1.0>
-
-Rules:
-- Apply {domain}-specific quality standards.
-- APPROVE only when the artifact genuinely meets domain best practices.
-- Be direct and specific — no vague feedback.
-- Do NOT add any text outside the format above.
-"""
-
 
 class ReviewerAgent(BaseAgent):
+    """Reviews artifacts locally using deterministic quality heuristics."""
+
     def __init__(
         self,
-        gemini_client: Optional[GeminiClient] = None,
+        gemini_client: Optional[object] = None,
     ) -> None:
-        super().__init__("reviewer", gemini_client)
+        super().__init__("reviewer", None)
 
     def run(
         self,
@@ -55,68 +29,44 @@ class ReviewerAgent(BaseAgent):
         domain: str = node.metadata.get("domain", "general problem-solving")
         artifact_type: str = node.metadata.get("artifact_type", "output")
 
-        if self.gemini is None or not getattr(self.gemini, "has_api_key", True):
-            return AgentResult(
-                answer="Review completed (no Gemini client).",
-                confidence=0.96,
-                metadata={
-                    "domain": domain,
-                    "artifact_type": artifact_type,
-                    "node_id": node.id,
-                },
-            )
-
-        system = _SYSTEM_TEMPLATE.format(
-            domain=domain,
-            artifact_type=artifact_type,
-        )
-        prompt = (
-            f"{system}\n\n"
-            f"Artifact to review:\n{artifact}\n"
-            f"Node metadata: {node.metadata}"
+        issues = _check_artifact(artifact)
+        verdict = "APPROVE" if len(issues) <= 1 else "REQUEST_CHANGES"
+        issue_lines = "\n".join(f"- {issue}" for issue in issues) or "- None"
+        suggestions = (
+            "- None"
+            if verdict == "APPROVE"
+            else "- Expand sections marked as incomplete\n- Add domain-specific validation"
         )
 
-        try:
-            raw = self.gemini.generate(prompt, temperature=0.2)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("ReviewerAgent Gemini call failed: %s", exc)
-            return AgentResult(
-                answer=f"Review failed: {exc}",
-                confidence=0.0,
-                metadata={"error": str(exc), "domain": domain},
-            )
-
-        confidence = _parse_confidence(raw, default=0.92)
-        verdict = _parse_verdict(raw)
+        raw = (
+            f"VERDICT: {verdict}\n"
+            f"ISSUES:\n{issue_lines}\n"
+            f"SUGGESTIONS:\n{suggestions}\n"
+            "CONFIDENCE: 0.82"
+        )
 
         return AgentResult(
             answer=raw,
-            confidence=confidence,
+            confidence=0.82,
             metadata={
                 "verdict": verdict,
                 "domain": domain,
                 "artifact_type": artifact_type,
                 "node_id": node.id,
+                "local_fallback": True,
             },
         )
 
 
-# ---------------------------------------------------------------------------
-# Parse helpers
-# ---------------------------------------------------------------------------
-
-def _parse_confidence(text: str, *, default: float) -> float:
-    m = re.search(r"CONFIDENCE:\s*([\d.]+)", text, re.IGNORECASE)
-    if m:
-        try:
-            return max(0.0, min(1.0, float(m.group(1))))
-        except ValueError:
-            pass
-    return default
-
-
-def _parse_verdict(text: str) -> str:
-    m = re.search(
-        r"VERDICT:\s*(APPROVE|REQUEST_CHANGES)", text, re.IGNORECASE
-    )
-    return m.group(1).upper() if m else "UNKNOWN"
+def _check_artifact(artifact: str) -> list[str]:
+    issues: list[str] = []
+    text = (artifact or "").strip()
+    if len(text) < 80:
+        issues.append("Artifact is very short")
+    if "## Task" not in text and "Task:" not in text:
+        issues.append("Missing explicit task section")
+    if "OUTPUT:" not in text and len(text) < 120:
+        issues.append("Missing structured output block")
+    if text.count("TODO") > 0:
+        issues.append("Contains TODO placeholders")
+    return issues

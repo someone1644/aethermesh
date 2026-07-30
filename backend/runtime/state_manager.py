@@ -56,9 +56,15 @@ class StateManager:
     def apply_agent_result(
         self,
         result: AgentResult,
+        *,
+        agent_type: str | None = None,
     ) -> None:
         """
         Update execution state using an AgentResult.
+
+        ``final_output`` only tracks the coder agent's artifact — the actual
+        deliverable — so it isn't clobbered by whichever agent happens to run
+        last (e.g. a researcher node a policy appends after the evaluator).
         """
         self.update_confidence(result.confidence)
         self.state.repository_found = result.metadata.get(
@@ -73,7 +79,8 @@ class StateManager:
             "sources",
             self.state.sources,
         )
-        self.state.final_output = result.answer
+        if agent_type == "coder":
+            self.state.final_output = result.answer
     def mark_node_active(
         self,
         node: WorkflowNode,

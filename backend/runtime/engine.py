@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import logging
 import time
+from copy import deepcopy
+from typing import Any
 
+from agents.context_utils import format_shared_context
 from agents.registry import AgentRegistry
+from config import settings
 
 from models.agent_result import AgentResult
 from models.execution import ExecutionState
@@ -17,6 +21,8 @@ from runtime.policy_engine import PolicyEngine
 from runtime.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
+
+_GEMINI_AGENTS = frozenset({"planner", "researcher"})
 
 
 class RuntimeEngine:
@@ -48,6 +54,8 @@ class RuntimeEngine:
         start_time = time.time()
 
         workflow = state.workflow
+        shared_context: dict[str, str] = {}
+        delay_s = max(0.0, settings.GEMINI_AGENT_DELAY_SECONDS)
 
         while workflow.has_next():
 
@@ -56,35 +64,42 @@ class RuntimeEngine:
             if node is None:
                 break
 
-            manager.mark_node_active(node)
+            if delay_s > 0:
+                time.sleep(delay_s)
+
+            prepared = self._prepare_node(node, shared_context)
+
+            manager.mark_node_active(prepared)
 
             self.logger.agent_started(
                 state,
-                node.id,
-                node.agent_type,
+                prepared.id,
+                prepared.agent_type,
             )
 
             try:
-                result = self.execute_agent(node)
+                result = self.execute_agent(prepared)
             except Exception as exc:
                 logger.error(
                     "Agent '%s' (node=%s) crashed: %s",
-                    node.agent_type,
-                    node.id,
+                    prepared.agent_type,
+                    prepared.id,
                     exc,
                 )
-                manager.mark_node_failed(node)
+                manager.mark_node_failed(prepared)
                 self.logger.agent_completed(
                     state,
-                    node.id,
-                    node.agent_type,
+                    prepared.id,
+                    prepared.agent_type,
                     confidence=0.0,
                 )
                 continue
 
+            shared_context[prepared.agent_type] = result.answer
+
             self.process_result(
                 manager,
-                node,
+                prepared,
                 result,
             )
 
@@ -101,12 +116,12 @@ class RuntimeEngine:
                 )
 
             # Mark node completed after policy evaluation
-            manager.mark_node_completed(node)
+            manager.mark_node_completed(prepared)
 
             self.logger.agent_completed(
                 state,
-                node.id,
-                node.agent_type,
+                prepared.id,
+                prepared.agent_type,
                 confidence=result.confidence,
             )
 
@@ -118,6 +133,28 @@ class RuntimeEngine:
         self.logger.workflow_completed(state)
 
         return manager.get_state()
+
+    @staticmethod
+    def _prepare_node(
+        node: WorkflowNode,
+        shared_context: dict[str, str],
+    ) -> WorkflowNode:
+        """Inject accumulated context before an agent runs."""
+        prepared = deepcopy(node)
+        metadata: dict[str, Any] = dict(prepared.metadata)
+        metadata["shared_context"] = dict(shared_context)
+
+        if prepared.agent_type in ("coder", "reviewer", "evaluator"):
+            metadata["context"] = format_shared_context(shared_context)
+
+        if prepared.agent_type in ("reviewer", "evaluator"):
+            metadata["artifact"] = shared_context.get(
+                "coder",
+                shared_context.get("plan", shared_context.get("planner", "")),
+            )
+
+        prepared.metadata = metadata
+        return prepared
 
     def execute_agent(
         self,
@@ -140,7 +177,7 @@ class RuntimeEngine:
         result: AgentResult,
     ) -> None:
 
-        manager.apply_agent_result(result)
+        manager.apply_agent_result(result, agent_type=node.agent_type)
 
     def _evaluate_and_mutate(
         self,

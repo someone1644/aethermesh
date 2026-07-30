@@ -6,6 +6,10 @@ import Run from './pages/Run'
 import PastRuns from './pages/PastRuns'
 import Policy from './pages/Policy'
 import About from './pages/About'
+import Logs from './pages/Logs'
+import Timeline from './pages/Timeline'
+import WorkflowGraph from './pages/WorkflowGraph'
+import Replay from './pages/Replay'
 
 export default function App() {
   return (
@@ -19,6 +23,10 @@ export default function App() {
             <Route path="/run" element={<Run />} />
             <Route path="/runs" element={<PastRuns />} />
             <Route path="/policy" element={<Policy />} />
+            <Route path="/logs" element={<Logs />} />
+            <Route path="/timeline" element={<Timeline />} />
+            <Route path="/graph" element={<WorkflowGraph />} />
+            <Route path="/replay" element={<Replay />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </main>

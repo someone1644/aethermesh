@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from models.node import WorkflowNode
 from models.workflow import Workflow
-from services.gemini_client import GeminiClient
+from services.gemini_client import GeminiClient, GeminiRateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -23,67 +23,36 @@ _KNOWN_AGENT_TYPES = [
 ]
 
 # ---------------------------------------------------------------------------
-# Domain detection prompt
-# Used once per generate() call to classify the task before planning nodes.
+# Combined domain + workflow planning prompt (single Gemini call)
 # ---------------------------------------------------------------------------
-_DOMAIN_PROMPT = """\
-You are a task classifier. Given a task description, identify:
-1. The primary domain (e.g. "cybersecurity", "web development", "data science",
-   "software engineering", "devops", "machine learning", "content writing",
-   "network engineering", "cloud infrastructure", "general problem-solving", etc.)
-2. The primary artifact type the workflow should produce (e.g. "Python module",
-   "penetration test report", "React component", "SQL schema", "CI/CD pipeline",
-   "research summary", "threat model", "data pipeline", "REST API", etc.)
-
-Respond in this exact format:
-DOMAIN: <domain string>
-ARTIFACT_TYPE: <artifact type string>
-
-Rules:
-- Be concise — one line each.
-- Do NOT add any text outside the format above.
-
-Task: {task}
-"""
-
-# ---------------------------------------------------------------------------
-# Workflow planning prompt
-# ---------------------------------------------------------------------------
-_SYSTEM_PROMPT = """\
+_COMBINED_PROMPT = """\
 You are a workflow planning assistant for an AI agent runtime system.
 
-The task belongs to the domain: {domain}
-The primary artifact to produce is: {artifact_type}
+Given the task description you must:
+1. Classify the primary domain (e.g. "cybersecurity", "web development", "data science")
+2. Identify the primary artifact type to produce (e.g. "Python module", "REST API")
+3. Return a JSON array of workflow nodes
 
-Given the task description you must return a JSON array of workflow nodes.
 Each node MUST have exactly these fields:
   - "name"          : string — a short, descriptive label for the step
   - "agent_type"    : string — one of: {agent_types}
-  - "metadata"      : object — MUST include "domain", "artifact_type", and "task";
-                      add any other relevant key/value pairs for this step
+  - "metadata"      : object — MUST include "domain", "artifact_type", and "task"
 
 Guidelines:
 - Always start with a "planner" node to decompose the task.
 - Include a "researcher" node when information gathering is required.
-- Include one or more "coder" nodes to produce the {artifact_type}.
-- Include a "reviewer" node to quality-check the {artifact_type}.
+- Include one or more "coder" nodes to produce the artifact.
+- Include a "reviewer" node to quality-check the artifact.
 - End with an "evaluator" node to score the final result.
 - Keep the sequence logical and minimal — avoid redundant nodes.
-- Return ONLY the JSON array, no markdown fences, no explanation.
 
-Example output:
-[
-  {{"name": "Plan task", "agent_type": "planner",
-    "metadata": {{"domain": "{domain}", "artifact_type": "{artifact_type}", "task": "..."}}}},
-  {{"name": "Research context", "agent_type": "researcher",
-    "metadata": {{"domain": "{domain}", "artifact_type": "{artifact_type}", "task": "..."}}}},
-  {{"name": "Produce {artifact_type}", "agent_type": "coder",
-    "metadata": {{"domain": "{domain}", "artifact_type": "{artifact_type}", "task": "..."}}}},
-  {{"name": "Review {artifact_type}", "agent_type": "reviewer",
-    "metadata": {{"domain": "{domain}", "artifact_type": "{artifact_type}", "task": "..."}}}},
-  {{"name": "Evaluate result", "agent_type": "evaluator",
-    "metadata": {{"domain": "{domain}", "artifact_type": "{artifact_type}", "task": "..."}}}}
-]
+Respond in this exact format:
+DOMAIN: <domain string>
+ARTIFACT_TYPE: <artifact type string>
+NODES:
+<JSON array only — no markdown fences, no explanation>
+
+Task: {task}
 """
 
 
@@ -106,26 +75,28 @@ class WorkflowGenerator:
 
     def generate(self, task: str) -> Workflow:
         """
-        Ask Gemini to plan a workflow for *task* and return a populated
-        :class:`~models.workflow.Workflow` ready for the RuntimeEngine.
+        Ask Gemini to plan a workflow for *task* in a single API call.
 
         Falls back to a sensible default workflow on any parsing failure
         so the runtime is never left without a usable plan.
         """
         try:
-            domain, artifact_type = self._detect_domain(task)
-            logger.info(
-                "WorkflowGenerator: domain=%r artifact_type=%r for task=%r",
-                domain, artifact_type, task[:60],
+            prompt = _COMBINED_PROMPT.format(
+                task=task,
+                agent_types=", ".join(f'"{t}"' for t in _KNOWN_AGENT_TYPES),
             )
-
-            prompt = self._build_prompt(task, domain, artifact_type)
             raw = self._client.generate(
                 prompt,
                 temperature=0.2,
                 max_output_tokens=1024,
             )
-            node_defs = self._parse_json(raw)
+            domain = _parse_field(raw, "DOMAIN") or "general problem-solving"
+            artifact_type = _parse_field(raw, "ARTIFACT_TYPE") or "solution"
+            node_defs = self._parse_nodes(raw)
+            logger.info(
+                "WorkflowGenerator: domain=%r artifact_type=%r for task=%r",
+                domain, artifact_type, task[:60],
+            )
             workflow = self._build_workflow(
                 node_defs, task=task, domain=domain, artifact_type=artifact_type
             )
@@ -136,6 +107,12 @@ class WorkflowGenerator:
             )
             return workflow
 
+        except GeminiRateLimitError as exc:
+            logger.warning(
+                "WorkflowGenerator: rate limited, using default workflow. Reason: %s",
+                exc,
+            )
+            return self._default_workflow(task)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "WorkflowGenerator: falling back to default workflow. Reason: %s",
@@ -147,30 +124,13 @@ class WorkflowGenerator:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _detect_domain(self, task: str) -> tuple[str, str]:
-        """
-        Ask Gemini to classify the task and return (domain, artifact_type).
-        Falls back to safe defaults if parsing fails.
-        """
-        prompt = _DOMAIN_PROMPT.format(task=task)
-        try:
-            raw = self._client.generate(prompt, temperature=0.1, max_output_tokens=64)
-            domain = _parse_field(raw, "DOMAIN") or "general problem-solving"
-            artifact_type = _parse_field(raw, "ARTIFACT_TYPE") or "solution"
-            return domain, artifact_type
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("WorkflowGenerator domain detection failed: %s", exc)
-            return "general problem-solving", "solution"
-
-    def _build_prompt(
-        self, task: str, domain: str, artifact_type: str
-    ) -> str:
-        system = _SYSTEM_PROMPT.format(
-            domain=domain,
-            artifact_type=artifact_type,
-            agent_types=", ".join(f'"{t}"' for t in _KNOWN_AGENT_TYPES),
-        )
-        return f"{system}\n\nTask: {task}"
+    def _parse_nodes(self, raw: str) -> List[Dict[str, Any]]:
+        """Extract and parse the JSON array after the NODES: marker."""
+        nodes_section = raw
+        marker = re.search(r"^NODES:\s*", raw, re.IGNORECASE | re.MULTILINE)
+        if marker:
+            nodes_section = raw[marker.end() :]
+        return self._parse_json(nodes_section)
 
     def _parse_json(self, raw: str) -> List[Dict[str, Any]]:
         """Extract and parse the JSON array from the model response."""

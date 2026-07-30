@@ -31,12 +31,13 @@ export function useEvents() {
         try {
           const result = await submitTask(targetTask)
           setExecutionState(result)
-        } catch (err: any) {
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Task execution failed.'
           setExecutionState({
             ...completedExecutionState,
             task: targetTask,
             status: 'failed',
-            final_output: err?.message || 'Task execution failed.',
+            final_output: message,
           })
         } finally {
           setLive(false)
