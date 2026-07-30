@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from models.event import (
     EventType,
@@ -17,11 +18,37 @@ class EventLogger:
     Records RuntimeEvents onto an ExecutionState and keeps a
     parallel in-memory index keyed by workflow_id so the
     ReplayReader can reconstruct execution history.
+
+    Also supports async broadcast to SSE subscribers via asyncio.Queue.
     """
 
     def __init__(self) -> None:
         # workflow_id → list of events (for replay)
         self._event_store: Dict[str, List[RuntimeEvent]] = {}
+        # Active SSE subscriber queues
+        self._subscribers: Set[asyncio.Queue] = set()
+
+    # ------------------------------------------------------------------
+    # SSE broadcast support
+    # ------------------------------------------------------------------
+
+    def subscribe(self) -> asyncio.Queue:
+        """Create and return a new subscriber queue for SSE streaming."""
+        queue: asyncio.Queue = asyncio.Queue()
+        self._subscribers.add(queue)
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        """Remove a subscriber queue."""
+        self._subscribers.discard(queue)
+
+    def _broadcast(self, event: RuntimeEvent) -> None:
+        """Push an event to all active SSE subscribers (non-blocking)."""
+        for queue in self._subscribers:
+            try:
+                queue.put_nowait(event)
+            except Exception:
+                pass  # If a queue is full, skip — subscriber will catch up
 
     # ------------------------------------------------------------------
     # Core logging
@@ -44,6 +71,10 @@ class EventLogger:
         state.add_event(event)
         if hasattr(state, "workflow") and hasattr(state.workflow, "id"):
             self.store_event(state.workflow.id, event)
+
+        # Broadcast to SSE subscribers
+        self._broadcast(event)
+
         logger.debug(
             "EventLogger | %s | %s",
             event_type.value,

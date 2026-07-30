@@ -51,64 +51,88 @@ const TimeoutIcon = () => (
   </IconShell>
 )
 
-const POLICIES: { key: string; name: string; description: string; Icon: () => ReactNode }[] = [
+const LowSourcesIcon = () => (
+  <IconShell>
+    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+    <path d="M9 10h6" />
+  </IconShell>
+)
+
+const POLICIES: { key: string; name: string; description: string; Icon: () => ReactNode; color: string }[] = [
   {
     key: 'low_confidence',
     name: 'Low Confidence',
     description: 'Flags an agent result when its confidence score falls below the safe-execution threshold.',
     Icon: LowConfidenceIcon,
+    color: '#fbbf24',
   },
   {
     key: 'contradiction',
     name: 'Contradiction',
     description: 'Detects conflicting evidence gathered across agents and halts execution before it compounds.',
     Icon: ContradictionIcon,
+    color: '#f87171',
   },
   {
     key: 'missing_repo',
     name: 'Missing Repository',
     description: 'Flags when a referenced repository or resource cannot be located before agents act on it.',
     Icon: MissingRepoIcon,
+    color: '#6366f1',
   },
   {
     key: 'execution_timeout',
     name: 'Execution Timeout',
     description: 'Flags a workflow that has exceeded its allotted execution time and may be stuck.',
     Icon: TimeoutIcon,
+    color: '#f97316',
+  },
+  {
+    key: 'low_sources',
+    name: 'Low Sources',
+    description: 'Adds additional research when too few sources are found to support confident execution.',
+    Icon: LowSourcesIcon,
+    color: '#22d3ee',
   },
 ]
 
-const ACTION_LABEL: Record<string, string> = {
-  add: 'Added node',
-  remove: 'Removed node',
-  replace: 'Replaced node',
-  none: 'No action',
+const ACTION_LABEL: Record<string, { text: string; color: string }> = {
+  add: { text: 'Added node', color: '#34d399' },
+  remove: { text: 'Removed node', color: '#f87171' },
+  replace: { text: 'Replaced node', color: '#fbbf24' },
+  none: { text: 'No action', color: '#71717a' },
 }
 
 function LiveDecisions({ decisions }: { decisions: RuntimeDecision[] }) {
   return (
     <div className="space-y-3">
-      {decisions.map((d, i) => (
-        <div
-          key={`${d.policy_name}-${i}`}
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-        >
-          <div className="flex items-center justify-between gap-2.5">
-            <span className="font-mono text-sm font-medium text-[var(--color-text)]">{d.policy_name}</span>
-            <span className="font-mono text-xs uppercase tracking-wide text-[var(--color-accent)]">
-              {ACTION_LABEL[d.action] ?? d.action}
-            </span>
+      {decisions.map((d, i) => {
+        const action = ACTION_LABEL[d.action] ?? ACTION_LABEL.none
+        return (
+          <div
+            key={`${d.policy_name}-${i}`}
+            className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 card-hover animate-fade-in-up stagger-${i + 1}`}
+          >
+            <div className="flex items-center justify-between gap-2.5">
+              <span className="font-mono text-sm font-medium text-[var(--color-text)]">{d.policy_name}</span>
+              <span
+                className="rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide"
+                style={{ color: action.color, backgroundColor: `${action.color}15` }}
+              >
+                {action.text}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">{d.reason}</p>
+            {(d.target_node || d.new_node) && (
+              <p className="mt-2 font-mono text-[11px] text-[var(--color-text-faint)]">
+                {d.target_node ? `target: ${d.target_node}` : ''}
+                {d.target_node && d.new_node ? ' → ' : ''}
+                {d.new_node ? `new: ${d.new_node}` : ''}
+              </p>
+            )}
           </div>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{d.reason}</p>
-          {(d.target_node || d.new_node) && (
-            <p className="mt-1 font-mono text-xs text-[var(--color-text-muted)]">
-              {d.target_node ? `target: ${d.target_node}` : ''}
-              {d.target_node && d.new_node ? ' · ' : ''}
-              {d.new_node ? `new: ${d.new_node}` : ''}
-            </p>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -117,30 +141,27 @@ function LiveDecisions({ decisions }: { decisions: RuntimeDecision[] }) {
 function PolicyReference() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {POLICIES.map(({ key, name, description, Icon }) => (
+      {POLICIES.map(({ key, name, description, Icon, color }, i) => (
         <div
           key={key}
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 card-hover animate-fade-in-up stagger-${i + 1}`}
         >
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--color-surface-hover)] text-[var(--color-text)]">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-lg"
+              style={{ backgroundColor: `${color}15`, color }}
+            >
               <Icon />
             </span>
             <span className="font-mono text-sm font-medium text-[var(--color-text)]">{name}</span>
           </div>
-          <p className="mt-3 text-sm text-[var(--color-text-muted)]">{description}</p>
+          <p className="mt-3 text-[13px] leading-relaxed text-[var(--color-text-muted)]">{description}</p>
         </div>
       ))}
     </div>
   )
 }
 
-/**
- * Renders live RuntimeDecisions from the backend's PolicyEngine when a run has
- * produced any (derived from `policy_triggered`/`node_*` events). Falls back to
- * a static reference of the policies AetherMesh evaluates when none exist yet
- * (idle state, or a run that didn't trigger any policy).
- */
 export default function DecisionPanel({ decisions }: { decisions?: RuntimeDecision[] } = {}) {
   if (decisions && decisions.length > 0) {
     return <LiveDecisions decisions={decisions} />

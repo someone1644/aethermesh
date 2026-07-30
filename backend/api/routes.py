@@ -154,9 +154,28 @@ async def event_stream():
     """
     Server-Sent Events endpoint.
     Streams runtime events to the frontend for live visualization.
+    Subscribes to the shared EventLogger's broadcast queue.
     """
 
     async def _generate() -> AsyncGenerator[dict, None]:
+        # Send initial connected message
         yield {"data": json.dumps({"event_type": "connected", "reason": "SSE stream ready"})}
+
+        # Subscribe to live event broadcasts
+        queue = event_logger.subscribe()
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield {
+                        "data": json.dumps(event.model_dump(mode="json"))
+                    }
+                except asyncio.TimeoutError:
+                    # Send keepalive to prevent connection timeout
+                    yield {"data": json.dumps({"event_type": "keepalive", "reason": "connection alive"})}
+        except asyncio.CancelledError:
+            pass
+        finally:
+            event_logger.unsubscribe(queue)
 
     return EventSourceResponse(_generate())

@@ -108,31 +108,65 @@ const NAV_ITEMS: { to: string; label: string; Icon: () => ReactNode; end?: boole
 
 export default function Header() {
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
+    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-elevated)]">
+      {/* Brand */}
       <div className="px-5 py-5">
-        <span className="font-mono text-base font-semibold tracking-tight text-[var(--color-text)]">
-          AetherMesh
-        </span>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/20">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <span className="font-mono text-sm font-semibold tracking-tight gradient-text">
+            AetherMesh
+          </span>
+        </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 px-3">
-        {NAV_ITEMS.map(({ to, label, Icon, end }) => (
+
+      {/* Divider */}
+      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-[var(--color-border)] to-transparent" />
+
+      {/* Navigation */}
+      <nav className="flex flex-1 flex-col gap-0.5 px-3 py-3">
+        {NAV_ITEMS.map(({ to, label, Icon, end }, i) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+              `group flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-all duration-200 animate-slide-in-left stagger-${i + 1} ${
                 isActive
-                  ? 'bg-[var(--color-primary-soft)] font-medium text-[var(--color-text)]'
+                  ? 'bg-[var(--color-primary-soft)] font-medium text-[var(--color-text)] shadow-sm shadow-indigo-500/5'
                   : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
               }`
             }
           >
-            <Icon />
-            {label}
+            {({ isActive }) => (
+              <>
+                <span className={`transition-colors duration-200 ${isActive ? 'text-[var(--color-primary)]' : 'group-hover:text-[var(--color-text)]'}`}>
+                  <Icon />
+                </span>
+                {label}
+                {isActive && (
+                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--color-primary)] animate-scale-in" />
+                )}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
+
+      {/* Footer */}
+      <div className="border-t border-[var(--color-border)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[var(--color-accent-emerald)] animate-glow-pulse" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--color-text-faint)]">
+            Runtime v1.0
+          </span>
+        </div>
+      </div>
     </aside>
   )
 }

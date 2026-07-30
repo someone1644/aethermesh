@@ -21,12 +21,12 @@ export default function TaskInput() {
         onChange={(e) => setTask(e.target.value)}
         placeholder="Describe a task for AetherMesh to run…"
         disabled={isLive}
-        className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none disabled:opacity-50"
+        className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] focus:outline-none input-glow transition-all disabled:opacity-50"
       />
       <button
         type="submit"
         disabled={isLive || !task.trim()}
-        className="rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+        className="rounded-lg btn-primary px-5 py-2.5 text-sm font-medium"
       >
         {isLive ? 'Running…' : 'Run'}
       </button>

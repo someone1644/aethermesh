@@ -20,6 +20,7 @@ export interface WorkflowEdge {
 }
 
 export interface Workflow {
+  id?: string
   nodes: WorkflowNode[]
   edges: WorkflowEdge[]
   current_node: string | null

@@ -24,8 +24,9 @@ export default function WorkflowEdge({
       path={edgePath}
       markerEnd={markerEnd}
       style={{
-        stroke: data?.active ? 'var(--color-accent)' : 'var(--color-border)',
+        stroke: data?.active ? 'var(--color-primary)' : '#27272a',
         strokeWidth: data?.active ? 2.5 : 1.5,
+        filter: data?.active ? 'drop-shadow(0 0 4px rgba(99,102,241,0.3))' : undefined,
       }}
     />
   )
