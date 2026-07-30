@@ -20,6 +20,10 @@ _KNOWN_AGENT_TYPES = [
     "coder",
     "reviewer",
     "evaluator",
+    "debugger",
+    "security_auditor",
+    "optimizer",
+    "sandbox_runner",
 ]
 
 # ---------------------------------------------------------------------------

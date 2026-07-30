@@ -17,11 +17,15 @@ Usage (e.g. from an API route or lifespan handler)::
 """
 
 from agents.coder_agent import CoderAgent
+from agents.debugger_agent import DebuggerAgent
 from agents.evaluator_agent import EvaluatorAgent
+from agents.optimizer_agent import OptimizerAgent
 from agents.planner_agent import PlannerAgent
 from agents.registry import AgentRegistry
 from agents.researcher_agent import ResearcherAgent
 from agents.reviewer_agent import ReviewerAgent
+from agents.sandbox_runner import SandboxRunnerAgent
+from agents.security_agent import SecurityAuditorAgent
 from services.gemini_client import GeminiClient
 from services.workflow_generator import WorkflowGenerator
 
@@ -35,11 +39,15 @@ def build_registry(gemini_client: GeminiClient) -> AgentRegistry:
     and researcher. Coder, reviewer, and evaluator run locally.
     """
     reg = AgentRegistry()
-    reg.register("planner",    PlannerAgent(gemini_client))
-    reg.register("researcher", ResearcherAgent(gemini_client))
-    reg.register("coder",      CoderAgent())
-    reg.register("reviewer",   ReviewerAgent())
-    reg.register("evaluator",  EvaluatorAgent())
+    reg.register("planner",          PlannerAgent(gemini_client))
+    reg.register("researcher",       ResearcherAgent(gemini_client))
+    reg.register("coder",            CoderAgent())
+    reg.register("reviewer",         ReviewerAgent())
+    reg.register("evaluator",        EvaluatorAgent())
+    reg.register("debugger",         DebuggerAgent())
+    reg.register("security_auditor", SecurityAuditorAgent())
+    reg.register("optimizer",        OptimizerAgent())
+    reg.register("sandbox_runner",   SandboxRunnerAgent())
     return reg
 
 
