@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict, List, Set
+from typing import Callable, Dict, List
 
 from models.event import (
     EventType,
@@ -12,6 +12,8 @@ from models.execution import ExecutionState
 
 logger = logging.getLogger(__name__)
 
+EventListener = Callable[[RuntimeEvent], None]
+
 
 class EventLogger:
     """
@@ -19,36 +21,15 @@ class EventLogger:
     parallel in-memory index keyed by workflow_id so the
     ReplayReader can reconstruct execution history.
 
-    Also supports async broadcast to SSE subscribers via asyncio.Queue.
+    Also supports live listeners per workflow_id so an in-progress
+    execution can be streamed (e.g. over SSE) as events are logged.
     """
 
     def __init__(self) -> None:
         # workflow_id → list of events (for replay)
         self._event_store: Dict[str, List[RuntimeEvent]] = {}
-        # Active SSE subscriber queues
-        self._subscribers: Set[asyncio.Queue] = set()
-
-    # ------------------------------------------------------------------
-    # SSE broadcast support
-    # ------------------------------------------------------------------
-
-    def subscribe(self) -> asyncio.Queue:
-        """Create and return a new subscriber queue for SSE streaming."""
-        queue: asyncio.Queue = asyncio.Queue()
-        self._subscribers.add(queue)
-        return queue
-
-    def unsubscribe(self, queue: asyncio.Queue) -> None:
-        """Remove a subscriber queue."""
-        self._subscribers.discard(queue)
-
-    def _broadcast(self, event: RuntimeEvent) -> None:
-        """Push an event to all active SSE subscribers (non-blocking)."""
-        for queue in self._subscribers:
-            try:
-                queue.put_nowait(event)
-            except Exception:
-                pass  # If a queue is full, skip — subscriber will catch up
+        # workflow_id → list of live listener callbacks
+        self._listeners: Dict[str, List[EventListener]] = {}
 
     # ------------------------------------------------------------------
     # Core logging
@@ -69,11 +50,10 @@ class EventLogger:
         )
 
         state.add_event(event)
+        workflow_id = None
         if hasattr(state, "workflow") and hasattr(state.workflow, "id"):
-            self.store_event(state.workflow.id, event)
-
-        # Broadcast to SSE subscribers
-        self._broadcast(event)
+            workflow_id = state.workflow.id
+            self.store_event(workflow_id, event)
 
         logger.debug(
             "EventLogger | %s | %s",
@@ -81,7 +61,37 @@ class EventLogger:
             reason,
         )
 
+        if workflow_id:
+            for callback in list(self._listeners.get(workflow_id, [])):
+                callback(event)
+
         return event
+
+    # ------------------------------------------------------------------
+    # Live streaming support
+    # ------------------------------------------------------------------
+
+    def add_listener(
+        self,
+        workflow_id: str,
+        callback: EventListener,
+    ) -> None:
+        """Register a callback invoked (synchronously, on the caller's
+        thread) each time an event is logged for *workflow_id*."""
+        self._listeners.setdefault(workflow_id, []).append(callback)
+
+    def remove_listener(
+        self,
+        workflow_id: str,
+        callback: EventListener,
+    ) -> None:
+        callbacks = self._listeners.get(workflow_id)
+        if not callbacks:
+            return
+        if callback in callbacks:
+            callbacks.remove(callback)
+        if not callbacks:
+            self._listeners.pop(workflow_id, None)
 
     # ------------------------------------------------------------------
     # Replay support
@@ -151,6 +161,8 @@ class EventLogger:
         node_id: str,
         agent_type: str,
         confidence: float,
+        *,
+        failed: bool = False,
     ) -> RuntimeEvent:
 
         return self.log(
@@ -161,6 +173,7 @@ class EventLogger:
                 "node_id": node_id,
                 "agent_name": agent_type,
                 "confidence": confidence,
+                "failed": failed,
             },
         )
 
@@ -184,6 +197,9 @@ class EventLogger:
         self,
         state: ExecutionState,
         node_id: str,
+        *,
+        name: str = "",
+        agent_type: str = "",
     ) -> RuntimeEvent:
 
         return self.log(
@@ -192,6 +208,8 @@ class EventLogger:
             "Node added.",
             {
                 "node_id": node_id,
+                "name": name,
+                "agent_type": agent_type,
             },
         )
 
@@ -215,6 +233,9 @@ class EventLogger:
         state: ExecutionState,
         old_node: str,
         new_node: str,
+        *,
+        name: str = "",
+        agent_type: str = "",
     ) -> RuntimeEvent:
 
         return self.log(
@@ -224,5 +245,7 @@ class EventLogger:
             {
                 "old_node": old_node,
                 "new_node": new_node,
+                "name": name,
+                "agent_type": agent_type,
             },
         )
