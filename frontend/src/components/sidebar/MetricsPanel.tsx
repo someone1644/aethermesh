@@ -1,15 +1,9 @@
 import type { ExecutionMetrics } from '../../types/runtime'
 
 function confidenceColor(confidence: number): string {
-  if (confidence < 0.5) return '#f87171'
-  if (confidence < 0.8) return '#fbbf24'
-  return '#34d399'
-}
-
-function confidenceGlow(confidence: number): string {
-  if (confidence < 0.5) return 'shadow-red-500/10'
-  if (confidence < 0.8) return 'shadow-amber-500/10'
-  return 'shadow-emerald-500/10'
+  if (confidence < 0.5) return 'var(--color-status-failed)'
+  if (confidence < 0.8) return '#D97706'
+  return 'var(--color-status-completed)'
 }
 
 export function ConfidenceMeter({ confidence }: { confidence: number }) {
@@ -18,18 +12,14 @@ export function ConfidenceMeter({ confidence }: { confidence: number }) {
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
+      <div className="mb-1.5 flex items-center justify-between font-mono text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
         <span>Confidence</span>
-        <span className="text-sm font-semibold" style={{ color }}>{pct}%</span>
+        <span style={{ color }}>{pct}%</span>
       </div>
-      <div className={`h-2 w-full overflow-hidden rounded-full bg-[var(--color-surface-hover)] shadow-inner ${confidenceGlow(confidence)}`}>
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]">
         <div
-          className="h-full rounded-full transition-all duration-700 ease-out"
-          style={{
-            width: `${pct}%`,
-            background: `linear-gradient(90deg, ${color}, ${color}dd)`,
-            boxShadow: `0 0 12px ${color}40`,
-          }}
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
     </div>
@@ -60,13 +50,13 @@ export default function MetricsPanel({
   ]
 
   return (
-    <div className="space-y-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 animate-fade-in-up">
+    <div className="space-y-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <ConfidenceMeter confidence={confidence} />
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[var(--color-border)] pt-4 text-sm">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-[var(--color-border)] pt-3 text-sm">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex flex-col gap-0.5">
-            <dt className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)]">{label}</dt>
-            <dd className="font-mono text-sm text-[var(--color-text)]">{value}</dd>
+          <div key={label} className="flex flex-col">
+            <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
+            <dd className="font-mono text-[var(--color-text)]">{value}</dd>
           </div>
         ))}
       </dl>

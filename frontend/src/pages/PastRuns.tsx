@@ -1,14 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { pastRuns } from '../mocks/executionState'
+import { pastRuns as mockPastRuns } from '../mocks/executionState'
 import { useRuntimeStore } from '../store/runtimeStore'
+import { API_BASE, USE_MOCKS } from '../api/runtime'
+import { getLocalPastRuns } from '../lib/pastRunsStore'
+import type { ExecutionState } from '../types/runtime'
 
 const STATUS_DOT: Record<string, string> = {
   completed: '#1E8E3E',
   failed: '#D93025',
   running: '#D97706',
   idle: '#9CA3AF',
+  paused_for_approval: '#D97706',
 }
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -24,19 +28,48 @@ export default function PastRuns() {
   const navigate = useNavigate()
   const setExecutionState = useRuntimeStore((s) => s.setExecutionState)
   const [query, setQuery] = useState('')
+  const [runs, setRuns] = useState<{ summary: any; state: ExecutionState }[]>([])
+
+  useEffect(() => {
+    const localRuns = getLocalPastRuns()
+
+    if (USE_MOCKS) {
+      const merged = [...localRuns, ...mockPastRuns]
+      const deduped = merged.filter((item, index, self) =>
+        index === self.findIndex((t) => t.summary.id === item.summary.id)
+      )
+      setRuns(deduped)
+      return
+    }
+
+    fetch(`${API_BASE}/history`)
+      .then((res) => res.json())
+      .then((data) => {
+        const backendRuns = Array.isArray(data) ? data : []
+        const merged = [...localRuns, ...backendRuns, ...mockPastRuns]
+        const deduped = merged.filter((item, index, self) =>
+          index === self.findIndex((t) => t.summary.id === item.summary.id || t.summary.task === item.summary.task)
+        )
+        setRuns(deduped)
+      })
+      .catch(() => {
+        const merged = [...localRuns, ...mockPastRuns]
+        setRuns(merged)
+      })
+  }, [])
 
   const filtered = useMemo(
-    () => pastRuns.filter((r) => r.summary.task.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () => runs.filter((r) => r.summary.task.toLowerCase().includes(query.toLowerCase())),
+    [query, runs],
   )
 
-  const total = pastRuns.length
-  const completed = pastRuns.filter((r) => r.summary.status === 'completed').length
-  const failed = pastRuns.filter((r) => r.summary.status === 'failed').length
-  const avgConfidence = total ? pastRuns.reduce((sum, r) => sum + r.summary.confidence, 0) / total : 0
+  const total = runs.length
+  const completed = runs.filter((r) => r.summary.status === 'completed').length
+  const failed = runs.filter((r) => r.summary.status === 'failed').length
+  const avgConfidence = total ? runs.reduce((sum, r) => sum + (r.summary.confidence || 0), 0) / total : 0
 
   const openRun = (id: string) => {
-    const run = pastRuns.find((r) => r.summary.id === id)
+    const run = runs.find((r) => r.summary.id === id)
     if (!run) return
     setExecutionState(run.state)
     navigate('/run')
@@ -83,17 +116,17 @@ export default function PastRuns() {
                   <span className="inline-flex items-center gap-1.5 font-mono text-xs uppercase text-[var(--color-text-muted)]">
                     <span
                       className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: STATUS_DOT[r.summary.status] }}
+                      style={{ backgroundColor: STATUS_DOT[r.summary.status] ?? '#9CA3AF' }}
                     />
                     {r.summary.status}
                   </span>
                 </td>
                 <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-text)]">
-                  {Math.round(r.summary.confidence * 100)}%
+                  {Math.round((r.summary.confidence || 0) * 100)}%
                 </td>
-                <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-text)]">{r.summary.mutations}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-text)]">{r.summary.mutations || 0}</td>
                 <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-text-muted)]">
-                  {dayjs(r.summary.startedAt).format('MMM D, HH:mm')}
+                  {r.summary.startedAt ? dayjs(r.summary.startedAt).format('MMM D, HH:mm') : '—'}
                 </td>
               </tr>
             ))}

@@ -1,6 +1,25 @@
 import type { ExecutionState, ExecutionStatus } from '../types/runtime'
 import type { RuntimeEvent } from '../types/event'
-import { foldEvents } from '../lib/workflowEvents'
+import { foldEvents, initialWorkflow } from '../lib/workflowEvents'
+
+export const idleExecutionState: ExecutionState = {
+  task: '',
+  status: 'idle',
+  workflow: initialWorkflow,
+  confidence: 0,
+  repository_found: false,
+  contradiction_score: 0,
+  sources: 0,
+  final_output: '',
+  events: [],
+  metrics: {
+    execution_time: 0,
+    mutations: 0,
+    completed_agents: 0,
+    failed_agents: 0,
+    confidence: 0,
+  },
+}
 
 function event(
   id: string,

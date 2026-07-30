@@ -1,12 +1,12 @@
 import type { Workflow } from './workflow'
 import type { RuntimeEvent } from './event'
 
-export type ExecutionStatus = 'idle' | 'running' | 'completed' | 'failed'
+export type ExecutionStatus = 'idle' | 'running' | 'completed' | 'failed' | 'paused_for_approval'
 
 /** Backend serializes lowercase ("running"); tolerate any casing at the API boundary. */
 export function normalizeStatus(raw: string): ExecutionStatus {
   const lower = raw.toLowerCase()
-  if (lower === 'idle' || lower === 'running' || lower === 'completed' || lower === 'failed') {
+  if (lower === 'idle' || lower === 'running' || lower === 'completed' || lower === 'failed' || lower === 'paused_for_approval') {
     return lower
   }
   return 'idle'

@@ -8,30 +8,24 @@ export interface WorkflowNodeData {
   status: NodeStatus
 }
 
-const STATUS_COLORS: Record<NodeStatus, { border: string; text: string; glow: string }> = {
-  pending: { border: '#27272a', text: '#52525b', glow: 'none' },
-  ready: { border: '#3f3f46', text: '#71717a', glow: 'none' },
-  active: { border: '#f59e0b', text: '#fbbf24', glow: '0 0 16px rgba(245, 158, 11, 0.2)' },
-  completed: { border: '#34d399', text: '#34d399', glow: '0 0 12px rgba(52, 211, 153, 0.12)' },
-  failed: { border: '#f87171', text: '#f87171', glow: '0 0 12px rgba(248, 113, 113, 0.12)' },
-  skipped: { border: '#27272a', text: '#52525b', glow: 'none' },
+const STATUS_STYLES: Record<NodeStatus, string> = {
+  pending: 'border-[var(--color-status-pending)] text-[var(--color-status-pending)]',
+  ready: 'border-[var(--color-status-ready)] text-[var(--color-status-ready)]',
+  active: 'border-[var(--color-status-active)] text-[var(--color-status-active)] animate-pulse-active',
+  completed: 'border-[var(--color-status-completed)] text-[var(--color-status-completed)]',
+  failed: 'border-[var(--color-status-failed)] text-[var(--color-status-failed)]',
+  skipped: 'border-[var(--color-status-skipped)] text-[var(--color-status-skipped)] opacity-60',
 }
 
 export default function WorkflowNode({ data }: NodeProps & { data: WorkflowNodeData }) {
-  const colors = STATUS_COLORS[data.status]
   return (
     <div
-      className={`min-w-[160px] rounded-xl border-2 bg-[var(--color-surface)] px-4 py-3 ${data.status === 'active' ? 'node-pulse' : ''}`}
-      style={{ borderColor: colors.border, boxShadow: colors.glow }}
+      className={`min-w-[160px] rounded-lg border-2 bg-[var(--color-surface)] px-4 py-3 shadow-lg ${STATUS_STYLES[data.status]}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-[var(--color-border)]" />
-      <div className="font-mono text-[10px] uppercase tracking-widest" style={{ color: colors.text }}>
-        {data.agentType}
-      </div>
+      <div className="font-mono text-xs uppercase tracking-wide opacity-70">{data.agentType}</div>
       <div className="mt-0.5 text-sm font-medium text-[var(--color-text)]">{data.label}</div>
-      <div className="mt-1 font-mono text-[10px] uppercase tracking-wider" style={{ color: colors.text }}>
-        {data.status}
-      </div>
+      <div className="mt-1 font-mono text-[10px] uppercase tracking-wider">{data.status}</div>
       <Handle type="source" position={Position.Right} className="!bg-[var(--color-border)]" />
     </div>
   )

@@ -9,6 +9,7 @@ class ExecutionStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    PAUSED_FOR_APPROVAL = "paused_for_approval"
 class ExecutionMetrics(BaseModel):
     execution_time: float = 0.0
     mutations: int = 0

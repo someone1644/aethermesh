@@ -3,9 +3,10 @@ import { runningExecutionState } from '../mocks/executionState'
 import type { ExecutionState } from '../types/runtime'
 import type { Workflow } from '../types/workflow'
 
-export async function getHealth(): Promise<{ status: string; app: string; version: string }> {
-  if (USE_MOCKS) return { status: 'healthy', app: 'AetherMesh Runtime', version: '1.0.0' }
-  return fetch(`${API_BASE}/health`).then((res) => res.json())
+export async function getExecutionState(): Promise<ExecutionState> {
+  if (USE_MOCKS) return runningExecutionState
+  // When the backend exposes it, swap the line above for:
+  return fetch(`${API_BASE}/execute`).then((res) => res.json())
 }
 
 export async function submitTask(task: string): Promise<ExecutionState> {

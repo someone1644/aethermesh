@@ -16,6 +16,7 @@ from runtime.engine import RuntimeEngine
 from runtime.policy_engine import PolicyEngine
 from runtime.replay import ReplayReader
 from runtime.workflow_graph import to_node_link_data
+from database import save_run, get_all_runs, get_run_by_id
 from services.bootstrap import (
     event_logger,
     gemini_client,
@@ -128,6 +129,12 @@ async def execute_task(body: TaskRequest):
         # 5. Execute (synchronous — runs in the event loop thread)
         result = await asyncio.to_thread(engine.execute, state)
 
+        # Save run to SQLite database
+        try:
+            save_run(result.workflow.id, result.model_dump(mode="json"))
+        except Exception:
+            logger.exception("Failed to save run to SQLite database.")
+
         # 6. Return serialized ExecutionState
         return result.model_dump(mode="json")
 
@@ -137,6 +144,40 @@ async def execute_task(body: TaskRequest):
             status_code=500,
             detail=f"Execution failed: {exc}",
         ) from exc
+
+
+@router.get("/history")
+async def get_history():
+    """
+    Fetch all historical execution runs saved in SQLite database.
+    """
+    try:
+        return get_all_runs()
+    except Exception as exc:
+        logger.exception("Failed to fetch history from SQLite.")
+        return []
+
+
+@router.post("/execute/{workflow_id}/approve")
+async def approve_mutation(workflow_id: str, action: str = "approve"):
+    """
+    Human-in-the-Loop (HITL) approval endpoint to resume a paused execution.
+    """
+    state = _running_states.get(workflow_id)
+    if not state:
+        # Check SQLite DB
+        db_state = get_run_by_id(workflow_id)
+        if not db_state:
+            raise HTTPException(status_code=404, detail="Workflow not found.")
+        return {"status": "ok", "message": f"Action {action!r} processed for workflow {workflow_id}."}
+
+    if state.status == ExecutionStatus.PAUSED_FOR_APPROVAL:
+        state.status = ExecutionStatus.RUNNING
+        event_logger.log(state, EventType.POLICY_TRIGGERED, f"Human operator approved action: {action}")
+        save_run(workflow_id, state.model_dump(mode="json"))
+        return {"status": "approved", "workflow_id": workflow_id}
+
+    return {"status": "ok", "message": f"Workflow is currently in status {state.status.value!r}."}
 
 
 # -----------------------------------------------------------------------
@@ -150,6 +191,23 @@ async def get_replay(workflow_id: str):
     Reconstruct and return execution replay steps for workflow_id.
     """
     try:
+        # First check SQLite DB
+        db_state = get_run_by_id(workflow_id)
+        if db_state and "events" in db_state:
+            return {
+                "workflow_id": workflow_id,
+                "steps": [
+                    {
+                        "timestamp": evt.get("timestamp", ""),
+                        "node_id": evt.get("details", {}).get("node_id", ""),
+                        "agent_name": evt.get("details", {}).get("agent_name", ""),
+                        "event_type": evt.get("event_type", ""),
+                        "payload": evt.get("details", {}),
+                    }
+                    for evt in db_state["events"]
+                ],
+            }
+
         reader = ReplayReader(event_logger)
         replay = reader.reconstruct(workflow_id)
         return {

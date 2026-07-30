@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ExecutionState } from '../types/runtime'
 import type { RuntimeEvent } from '../types/event'
-import { completedExecutionState } from '../mocks/executionState'
+import { idleExecutionState } from '../mocks/executionState'
 import { applyEventToWorkflow } from '../lib/workflowEvents'
 
 interface RuntimeStore {
@@ -14,7 +14,7 @@ interface RuntimeStore {
 }
 
 export const useRuntimeStore = create<RuntimeStore>((set) => ({
-  executionState: completedExecutionState,
+  executionState: idleExecutionState,
   isLive: false,
   setExecutionState: (state) => set({ executionState: state }),
   patchExecutionState: (patch) =>

@@ -6,21 +6,14 @@ import { USE_MOCKS } from '../api/runtime'
 import { completedExecutionState } from '../mocks/executionState'
 import { initialWorkflow } from '../lib/workflowEvents'
 import { normalizeStatus } from '../types/runtime'
+import { savePastRun } from '../lib/pastRunsStore'
 
-/** Minimum time each live event stays the "current" one before the next is applied.
- * The backend can legitimately log several events within milliseconds of each
- * other (e.g. a policy firing right as an agent completes), and a fast local
- * fallback response can make a node's active window near-instant. Without this,
- * those arrive faster than a human can perceive. This paces *display* only —
- * it never delays picking up new events that already arrived, so a genuinely
- * slow run (real Gemini calls) is never held back. */
 const LIVE_STEP_MS = 700
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/** Drives execution: streams a real run live in real mode, or replays mock events in mock mode. */
 export function useEvents() {
   const setExecutionState = useRuntimeStore((s) => s.setExecutionState)
   const patchExecutionState = useRuntimeStore((s) => s.patchExecutionState)
@@ -31,10 +24,12 @@ export function useEvents() {
     async (task?: string) => {
       const targetTask = task ?? completedExecutionState.task
       setExecutionState({
-        ...completedExecutionState,
         task: targetTask,
         status: 'running',
         confidence: 0,
+        repository_found: true,
+        contradiction_score: 0,
+        sources: 0,
         final_output: '',
         workflow: initialWorkflow,
         events: [],
@@ -45,9 +40,7 @@ export function useEvents() {
       if (!USE_MOCKS) {
         try {
           const { workflow_id, workflow } = await startTask(targetTask)
-          // Seed with the real backend-generated workflow (real node ids) so
-          // live events — which reference those same ids — fold in correctly.
-          patchExecutionState({ workflow })
+          patchExecutionState({ workflow: { ...workflow, id: workflow_id } })
 
           const applyPayload = (payload: ExecutionStreamPayload) => {
             appendEvent(payload.event)
@@ -62,10 +55,6 @@ export function useEvents() {
             })
           }
 
-          // Events are queued as they arrive (true live order, no waiting for
-          // the run to finish) but drained one at a time with a minimum step
-          // duration, so a burst of backend events still renders as a visible
-          // sequence rather than jumping several log entries at once.
           await new Promise<void>((resolve) => {
             const queue: ExecutionStreamPayload[] = []
             let draining = false
@@ -105,16 +94,24 @@ export function useEvents() {
           patchExecutionState({ status: 'failed', final_output: message })
         } finally {
           setLive(false)
+          // Save current state to local past runs store
+          const latestState = useRuntimeStore.getState().executionState
+          savePastRun(latestState)
         }
         return
       }
 
+      // Mock Mode
       const unsubscribe = subscribeToEvents((event) => {
         appendEvent(event)
         if (event.event_type === 'workflow_completed') {
-          setExecutionState({ ...completedExecutionState, task: targetTask })
+          patchExecutionState({ status: 'completed' })
           setLive(false)
           unsubscribe()
+
+          // Save completed run to past runs store
+          const latestState = useRuntimeStore.getState().executionState
+          savePastRun(latestState)
         }
       })
     },

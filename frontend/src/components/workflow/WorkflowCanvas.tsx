@@ -21,7 +21,7 @@ function layout(workflow: Workflow): { nodes: Node<WorkflowNodeData>[]; edges: E
   const nodes: Node<WorkflowNodeData>[] = workflow.nodes.map((n, i) => ({
     id: n.id,
     type: 'workflowNode',
-    position: { x: i * 240, y: (i % 2) * 100 },
+    position: { x: i * 220, y: (i % 2) * 90 },
     data: { label: n.name, agentType: n.agent_type, status: n.status },
   }))
 
@@ -50,14 +50,14 @@ export default function WorkflowCanvas({ workflow, className }: { workflow: Work
         proOptions={{ hideAttribution: true }}
         colorMode="dark"
       >
-        <Background variant={BackgroundVariant.Dots} color="#1e2030" gap={24} size={1} />
+        <Background variant={BackgroundVariant.Dots} color="var(--color-border)" gap={20} />
         <Controls showInteractive={false} />
         <MiniMap
           pannable
           zoomable
-          nodeColor="var(--color-primary)"
-          maskColor="rgba(10,10,15,0.7)"
-          style={{ backgroundColor: '#0f1017', borderColor: '#1e2030' }}
+          nodeColor="var(--color-accent)"
+          maskColor="rgba(10,10,15,0.6)"
+          style={{ backgroundColor: 'var(--color-surface)' }}
         />
       </ReactFlow>
     </div>
