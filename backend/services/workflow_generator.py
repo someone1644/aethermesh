@@ -35,8 +35,8 @@ _COMBINED_PROMPT = """\
 You are a workflow planning assistant for an AI agent runtime system.
 
 Given the task description you must:
-1. Classify the primary domain (e.g. "cybersecurity", "web development", "data science")
-2. Identify the primary artifact type to produce (e.g. "Python module", "REST API")
+1. Classify the primary domain (e.g. "cybersecurity", "performance", "web development", "general problem-solving")
+2. Identify the primary artifact type to produce (e.g. "vulnerability report", "optimization report", "solution")
 3. Return a JSON array of workflow nodes
 
 Each node MUST have exactly these fields:
@@ -47,13 +47,14 @@ Each node MUST have exactly these fields:
 Guidelines:
 - Always start with a "planner" node to decompose the task.
 - Include a "researcher" node when information gathering is required.
-- Include one or more "coder" nodes to produce the artifact.
-- Include a "reviewer" node to quality-check the artifact.
+- Select domain specialists based on the task:
+  * For security, vulnerability, IAM, S3, or audit tasks: include "security_auditor" and "sandbox_runner".
+  * For performance, concurrency, memory leak, or goroutine tasks: include "optimizer" and "sandbox_runner".
+  * For risk evaluation, business strategy, or trade-off analysis: include "analyst" and "summarizer".
+  * For code implementation tasks: include "coder" and "sandbox_runner".
+- Include a "reviewer" node to quality-check the output.
 - End with an "evaluator" node to score the final result.
-- Keep the sequence logical and minimal — avoid redundant nodes.
-- Name each node after its role, not its action: "Planner", "Researcher",
-  "Coder", "Reviewer", "Evaluator" (if there are multiple nodes of the same
-  agent_type, number them, e.g. "Coder 2").
+- Name each node after its role (e.g. "Planner", "Researcher", "Security Auditor", "Sandbox Runner", "Coder", "Reviewer", "Evaluator").
 
 Respond in this exact format:
 DOMAIN: <domain string>
@@ -210,20 +211,53 @@ class WorkflowGenerator:
 
     @staticmethod
     def _default_workflow(task: str = "") -> Workflow:
-        """Minimal safe workflow used when Gemini planning fails."""
+        """Domain-aware fallback workflow used when Gemini API is offline/rate-limited."""
         wf = Workflow()
+        task_lower = task.lower()
+
+        is_security = any(k in task_lower for k in ["security", "audit", "vulnerability", "iam", "s3", "key", "express", "sql", "terraform"])
+        is_perf = any(k in task_lower for k in ["memory", "leak", "goroutine", "race", "benchmark", "optimize", "golang", "grpc"])
+        is_general = any(k in task_lower for k in ["analysis", "risk", "trade-off", "postmortem", "strategy", "report", "serverless"])
+
+        if is_security:
+            domain, artifact_type = "cybersecurity", "vulnerability report"
+        elif is_perf:
+            domain, artifact_type = "performance", "optimization report"
+        elif is_general:
+            domain, artifact_type = "business strategy", "executive summary"
+        else:
+            domain, artifact_type = "general problem-solving", "solution"
+
         base_meta = {
-            "domain": "general problem-solving",
-            "artifact_type": "solution",
+            "domain": domain,
+            "artifact_type": artifact_type,
             "task": task,
         }
+
         nodes = [
-            WorkflowNode(name="Planner",    agent_type="planner",    metadata=dict(base_meta)),
+            WorkflowNode(name="Planner", agent_type="planner", metadata=dict(base_meta)),
             WorkflowNode(name="Researcher", agent_type="researcher", metadata=dict(base_meta)),
-            WorkflowNode(name="Coder",      agent_type="coder",      metadata=dict(base_meta)),
-            WorkflowNode(name="Reviewer",   agent_type="reviewer",   metadata=dict(base_meta)),
-            WorkflowNode(name="Evaluator",  agent_type="evaluator",  metadata=dict(base_meta)),
         ]
+
+        if is_security:
+            nodes.append(WorkflowNode(name="Security Auditor", agent_type="security_auditor", metadata=dict(base_meta)))
+            nodes.append(WorkflowNode(name="Coder", agent_type="coder", metadata=dict(base_meta)))
+            nodes.append(WorkflowNode(name="Sandbox Runner", agent_type="sandbox_runner", metadata=dict(base_meta)))
+        elif is_perf:
+            nodes.append(WorkflowNode(name="Optimizer", agent_type="optimizer", metadata=dict(base_meta)))
+            nodes.append(WorkflowNode(name="Coder", agent_type="coder", metadata=dict(base_meta)))
+            nodes.append(WorkflowNode(name="Sandbox Runner", agent_type="sandbox_runner", metadata=dict(base_meta)))
+        elif is_general:
+            nodes.append(WorkflowNode(name="Analyst", agent_type="analyst", metadata=dict(base_meta)))
+            nodes.append(WorkflowNode(name="Summarizer", agent_type="summarizer", metadata=dict(base_meta)))
+        else:
+            nodes.append(WorkflowNode(name="Coder", agent_type="coder", metadata=dict(base_meta)))
+
+        nodes.extend([
+            WorkflowNode(name="Reviewer", agent_type="reviewer", metadata=dict(base_meta)),
+            WorkflowNode(name="Evaluator", agent_type="evaluator", metadata=dict(base_meta)),
+        ])
+
         prev: Optional[str] = None
         for node in nodes:
             wf.add_node(node)

@@ -51,12 +51,12 @@ class AnalystAgent(BaseAgent):
             "traceability, which is critical for business and research contexts.\n\n"
             f"{'### Prior Plan Context' + chr(10) + plan_excerpt + chr(10) if plan_excerpt else ''}"
             f"{'### Research Notes' + chr(10) + research_excerpt + chr(10) if research_excerpt else ''}"
-            "CONFIDENCE: 0.87"
+            f"CONFIDENCE: {conf_score:.2f}"
         )
 
         return AgentResult(
             answer=raw,
-            confidence=0.87,
+            confidence=conf_score,
             metadata={
                 "agent_type": "analyst",
                 "node_id": node.id,

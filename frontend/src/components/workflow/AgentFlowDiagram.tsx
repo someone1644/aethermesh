@@ -27,6 +27,12 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   coder: 'Implements the fix',
   reviewer: 'Reviews the proposed change',
   evaluator: 'Scores final confidence',
+  debugger: 'Diagnoses root cause & hotfixes',
+  security_auditor: 'Audits OWASP & secrets',
+  optimizer: 'Profiles memory & performance',
+  sandbox_runner: 'Verifies sandbox execution',
+  analyst: 'Evaluates risks & trade-offs',
+  summarizer: 'Synthesizes executive report',
 }
 
 function AgentNode({ node }: { node: WorkflowNode }) {

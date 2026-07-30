@@ -38,18 +38,21 @@ class ReviewerAgent(BaseAgent):
             else "- Expand sections marked as incomplete\n- Add domain-specific validation"
         )
 
+        conf_score = round(max(0.60, 0.95 - (len(issues) * 0.12)), 2)
+
         raw = (
             f"VERDICT: {verdict}\n"
             f"ISSUES:\n{issue_lines}\n"
             f"SUGGESTIONS:\n{suggestions}\n"
-            "CONFIDENCE: 0.82"
+            f"CONFIDENCE: {conf_score:.2f}"
         )
 
         return AgentResult(
             answer=raw,
-            confidence=0.82,
+            confidence=conf_score,
             metadata={
                 "verdict": verdict,
+                "score": conf_score,
                 "domain": domain,
                 "artifact_type": artifact_type,
                 "node_id": node.id,

@@ -41,12 +41,12 @@ class SummarizerAgent(BaseAgent):
             "The plan-research-code-review-evaluate pipeline converged with high confidence. "
             f"Domain context ({domain}) was consistently applied across all agent outputs.\n\n"
             f"### Condensed Context\n{context_excerpt or '(No prior context available)'}\n\n"
-            "CONFIDENCE: 0.88"
+            f"CONFIDENCE: {conf_score:.2f}"
         )
 
         return AgentResult(
             answer=raw,
-            confidence=0.88,
+            confidence=conf_score,
             metadata={
                 "agent_type": "summarizer",
                 "node_id": node.id,

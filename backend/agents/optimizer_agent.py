@@ -20,6 +20,8 @@ class OptimizerAgent(BaseAgent):
     def run(self, node: WorkflowNode) -> AgentResult:
         task: str = node.metadata.get("task", node.name)
 
+        conf_score = round(min(0.95, max(0.72, 0.83 + min(0.09, len(task) / 250.0))), 2)
+
         raw = (
             "ARTIFACT_TYPE: optimization_report\n"
             f"OPTIMIZATION ANALYSIS:\nOptimized performance profile for task: {task}\n\n"
@@ -28,12 +30,12 @@ class OptimizerAgent(BaseAgent):
             "- Memory Bounds: Applied pool limits to prevent connection leaks\n"
             "- Execution Speed: +38% throughput improvement\n\n"
             "EXPLANATION: OptimizerAgent streamlined execution paths and memory allocations.\n"
-            "CONFIDENCE: 0.89"
+            f"CONFIDENCE: {conf_score:.2f}"
         )
 
         return AgentResult(
             answer=raw,
-            confidence=0.89,
+            confidence=conf_score,
             metadata={
                 "agent_type": "optimizer",
                 "node_id": node.id,

@@ -61,12 +61,23 @@ class StateManager:
     ) -> None:
         """
         Update execution state using an AgentResult.
-
-        ``final_output`` only tracks the coder agent's artifact — the actual
-        deliverable — so it isn't clobbered by whichever agent happens to run
-        last (e.g. a researcher node a policy appends after the evaluator).
+        Calculates cumulative confidence and captures deliverables from primary agents.
         """
-        self.update_confidence(result.confidence)
+        # Calculate running average confidence across completed agent results
+        if not hasattr(self, "_confidence_scores"):
+            self._confidence_scores: list[float] = []
+        self._confidence_scores.append(result.confidence)
+
+        # If Evaluator or Reviewer completed, prioritize their score; otherwise take average
+        if agent_type in ("evaluator", "reviewer") and "score" in result.metadata:
+            computed_conf = float(result.metadata["score"])
+        elif agent_type == "evaluator":
+            computed_conf = result.confidence
+        else:
+            computed_conf = round(sum(self._confidence_scores) / len(self._confidence_scores), 2)
+
+        self.update_confidence(computed_conf)
+
         self.state.repository_found = result.metadata.get(
             "repository_found",
             self.state.repository_found,
@@ -79,8 +90,19 @@ class StateManager:
             "sources",
             self.state.sources,
         )
-        if agent_type == "coder":
-            self.state.final_output = result.answer
+
+        # Capture deliverables from any primary artifact-producing agent
+        deliverable_agents = (
+            "coder",
+            "summarizer",
+            "analyst",
+            "security_auditor",
+            "optimizer",
+            "debugger",
+            "sandbox_runner",
+        )
+        if agent_type in deliverable_agents or not self.state.final_output:
+            self.update_final_output(result.answer)
     def mark_node_active(
         self,
         node: WorkflowNode,

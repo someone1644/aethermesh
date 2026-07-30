@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   BackgroundVariant,
   type Edge,
   type Node,
@@ -52,13 +51,6 @@ export default function WorkflowCanvas({ workflow, className }: { workflow: Work
       >
         <Background variant={BackgroundVariant.Dots} color="var(--color-border)" gap={20} />
         <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor="var(--color-accent)"
-          maskColor="rgba(10,10,15,0.6)"
-          style={{ backgroundColor: 'var(--color-surface)' }}
-        />
       </ReactFlow>
     </div>
   )

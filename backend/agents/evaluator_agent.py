@@ -41,12 +41,12 @@ class EvaluatorAgent(BaseAgent):
             f"CLARITY: {clarity:.2f}\n"
             f"FEEDBACK: Local evaluation for {domain} {artifact_type}. "
             "Scores reflect structure, length, and use of shared planner/research context.\n"
-            "CONFIDENCE: 0.80"
+            f"CONFIDENCE: {score:.2f}"
         )
 
         return AgentResult(
             answer=raw,
-            confidence=0.80,
+            confidence=score,
             metadata={
                 "score": score,
                 "completeness": completeness,
@@ -65,13 +65,22 @@ def _score_artifact(
     shared: dict,
 ) -> tuple[float, float, float, float]:
     text = (artifact or "").strip()
-    length_score = min(1.0, len(text) / 400.0)
-    has_plan = bool(shared.get("planner"))
-    has_research = bool(shared.get("researcher"))
-    context_bonus = 0.1 * int(has_plan) + 0.1 * int(has_research)
+    
+    # 1. Base length & specificity metric (longer, detailed artifacts score higher)
+    char_len = len(text)
+    length_score = min(1.0, max(0.40, char_len / 750.0))
 
-    completeness = min(1.0, length_score * 0.7 + context_bonus + 0.1)
-    correctness = 0.75 if "TODO" not in text else 0.45
-    clarity = 0.80 if ("##" in text or "OUTPUT:" in text) else 0.55
-    score = round((completeness + correctness + clarity) / 3.0, 2)
-    return score, round(completeness, 2), round(correctness, 2), round(clarity, 2)
+    # 2. Upstream agent synergy bonus (rewards multi-agent execution)
+    active_agents = len([k for k, v in shared.items() if v])
+    synergy_score = min(1.0, 0.40 + (active_agents * 0.12))
+
+    # 3. Domain artifact detection (code blocks, audits, or structured tables)
+    has_code = 1.0 if "```" in text else 0.65
+    has_structure = 1.0 if ("##" in text or "OUTPUT:" in text or "|" in text) else 0.50
+
+    completeness = round(min(1.0, (length_score * 0.5) + (synergy_score * 0.5)), 2)
+    correctness = round(min(1.0, (has_code * 0.6) + (0.4 if "TODO" not in text else 0.1)), 2)
+    clarity = round(min(1.0, (has_structure * 0.7) + (0.3 if char_len > 150 else 0.1)), 2)
+
+    score = round((completeness * 0.4) + (correctness * 0.3) + (clarity * 0.3), 2)
+    return score, completeness, correctness, clarity
