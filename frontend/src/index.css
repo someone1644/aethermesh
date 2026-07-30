@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #ffffff;
+  --color-surface: #f7f7f7;
+  --color-surface-hover: #ededed;
+  --color-border: #e5e5e5;
+  --color-text: #1d1d1d;
+  --color-text-muted: #6b6b6b;
+
+  --color-primary: #1d1d1d;
+  --color-primary-soft: #ededed;
+
+  /* aliases kept for older/unrouted components — resolve to the same monochrome tokens */
+  --color-accent: #1d1d1d;
+  --color-accent-soft: #ededed;
+
+  --color-status-pending: #9ca3af;
+  --color-status-ready: #6b6b6b;
+  --color-status-active: #d97706;
+  --color-status-completed: #1e8e3e;
+  --color-status-failed: #d93025;
+  --color-status-skipped: #9ca3af;
+
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes node-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  .node-pulse {
+    animation: node-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes dash-flow {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+  .connector-flow {
+    animation: dash-flow 1s linear infinite;
+  }
+}
