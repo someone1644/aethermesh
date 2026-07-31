@@ -5,7 +5,7 @@ import StatusBadge from '../components/common/StatusBadge'
 import FinalOutput from '../components/chat/FinalOutput'
 import { ConfidenceMeter } from '../components/sidebar/MetricsPanel'
 import EventLog from '../components/sidebar/EventLog'
-import AgentFlowDiagram from '../components/workflow/AgentFlowDiagram'
+import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 import { API_BASE, USE_MOCKS } from '../api/runtime'
 
 export default function Run() {
@@ -92,7 +92,10 @@ export default function Run() {
             </div>
           )}
 
-          <AgentFlowDiagram nodes={executionState.workflow.nodes} mutationNote={mutationNote} />
+          <div className="h-[360px] w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2 shadow-sm">
+            <WorkflowCanvas workflow={executionState.workflow} />
+            {mutationNote && <p className="p-3 font-mono text-xs text-[#B45309]">{mutationNote}</p>}
+          </div>
 
           <div className="max-w-xs">
             <ConfidenceMeter confidence={executionState.confidence} />

@@ -49,3 +49,21 @@ export function savePastRun(state: ExecutionState): void {
     console.error('Failed to save run to localStorage:', err)
   }
 }
+
+export function clearLocalPastRuns(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch (err) {
+    console.error('Failed to clear past runs:', err)
+  }
+}
+
+export function deletePastRun(id: string): void {
+  try {
+    const runs = getLocalPastRuns()
+    const updated = runs.filter((r) => r.summary.id !== id)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  } catch (err) {
+    console.error('Failed to delete run:', err)
+  }
+}

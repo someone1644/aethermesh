@@ -4,25 +4,22 @@ import { useEvents } from '../hooks/useEvents'
 import { useRuntime } from '../hooks/useRuntime'
 
 const PLACEHOLDERS = [
-  'Diagnose a failing CI pipeline…',
-  "Summarize last quarter's incident postmortems…",
-  'Investigate contradictory evidence in a document…',
-  'Patch a flaky test suite…',
+  'Summarize Q2 incident postmortems into one report…',
+  'Scan AWS Terraform definitions for open S3 buckets…',
+  'Audit HIPAA compliance for patient record storage…',
+  'Optimize gRPC microservice for goroutine leaks…',
 ]
 
 const SUGGESTIONS = [
-  'Diagnose the failing checkout-service CI pipeline',
   'Summarize Q2 incident postmortems into one report',
-  'Investigate contradictory evidence in refund-policy docs',
-  'Find and fix the flakiest test in the suite',
-  "Audit last week's failed deploys for root cause",
-  'Draft a rollback plan for the payments service',
-  'Trace a memory leak in the ingestion service',
-  'Reconcile mismatched inventory counts across warehouses',
-  'Explain why the nightly ETL job silently dropped rows',
-  'Compare two API response schemas for breaking changes',
-  'Identify the root cause of a spike in 5xx errors',
-  'Validate a database migration against staging data',
+  'Scan AWS Terraform definitions for open S3 buckets and IAM keys',
+  'Optimize a Golang gRPC microservice for goroutine leaks',
+  'Conduct a competitive risk analysis for AWS serverless migration',
+  'Audit HIPAA regulatory compliance for patient record storage',
+  'Synthesize clinical trial safety reports for new drug trials',
+  'Reconcile inventory discrepancy across regional logistics hubs',
+  'Investigate contradictory terms in customer refund policy docs',
+  'Audit financial fraud detection rules for false positive spikes',
 ]
 
 export default function Prompt() {

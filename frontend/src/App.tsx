@@ -8,7 +8,6 @@ import Policy from './pages/Policy'
 import About from './pages/About'
 import Logs from './pages/Logs'
 import Timeline from './pages/Timeline'
-import WorkflowGraph from './pages/WorkflowGraph'
 import Replay from './pages/Replay'
 
 export default function App() {
@@ -25,7 +24,6 @@ export default function App() {
             <Route path="/policy" element={<Policy />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/timeline" element={<Timeline />} />
-            <Route path="/graph" element={<WorkflowGraph />} />
             <Route path="/replay" element={<Replay />} />
             <Route path="/about" element={<About />} />
           </Routes>

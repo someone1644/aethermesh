@@ -9,6 +9,7 @@ export default function WorkflowEdge({
   targetPosition,
   markerEnd,
   data,
+  animated,
 }: EdgeProps & { data?: { active?: boolean } }) {
   const [edgePath] = getBezierPath({
     sourceX,
@@ -19,14 +20,19 @@ export default function WorkflowEdge({
     targetPosition,
   })
 
+  const isActive = data?.active || animated
+
   return (
     <BaseEdge
       path={edgePath}
       markerEnd={markerEnd}
       style={{
-        stroke: data?.active ? 'var(--color-accent)' : 'var(--color-border)',
-        strokeWidth: data?.active ? 2.5 : 1.5,
+        stroke: isActive ? '#F59E0B' : 'var(--color-border)',
+        strokeWidth: isActive ? 2.5 : 1.5,
+        strokeDasharray: isActive ? '6 4' : undefined,
+        opacity: isActive ? 1 : 0.6,
       }}
+      className={isActive ? 'connector-flow' : undefined}
     />
   )
 }
