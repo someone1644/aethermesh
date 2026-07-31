@@ -77,14 +77,7 @@ const TimelineIcon = () => (
   </IconShell>
 )
 
-const GraphIcon = () => (
-  <IconShell>
-    <circle cx="5" cy="6" r="2" />
-    <circle cx="19" cy="6" r="2" />
-    <circle cx="12" cy="18" r="2" />
-    <path d="M6.7 7.3 10.5 16M17.3 7.3 13.5 16M7 6h10" />
-  </IconShell>
-)
+
 
 const ReplayIcon = () => (
   <IconShell>
@@ -101,7 +94,6 @@ const NAV_ITEMS: { to: string; label: string; Icon: () => ReactNode; end?: boole
   { to: '/policy', label: 'Policy', Icon: PolicyIcon },
   { to: '/logs', label: 'Logs', Icon: LogsIcon },
   { to: '/timeline', label: 'Timeline', Icon: TimelineIcon },
-  { to: '/graph', label: 'Workflow graph', Icon: GraphIcon },
   { to: '/replay', label: 'Replay', Icon: ReplayIcon },
   { to: '/about', label: 'About', Icon: AboutIcon },
 ]

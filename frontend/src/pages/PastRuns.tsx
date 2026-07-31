@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import { pastRuns as mockPastRuns } from '../mocks/executionState'
 import { useRuntimeStore } from '../store/runtimeStore'
 import { API_BASE, USE_MOCKS } from '../api/runtime'
-import { getLocalPastRuns } from '../lib/pastRunsStore'
+import { getLocalPastRuns, clearLocalPastRuns, deletePastRun } from '../lib/pastRunsStore'
 import type { ExecutionState } from '../types/runtime'
 
 const STATUS_DOT: Record<string, string> = {
@@ -75,9 +75,33 @@ export default function PastRuns() {
     navigate('/run')
   }
 
+  const handleClearHistory = () => {
+    if (window.confirm('Are you sure you want to clear all local execution history?')) {
+      clearLocalPastRuns()
+      setRuns([])
+    }
+  }
+
+  const handleDeleteRun = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    deletePastRun(id)
+    setRuns((prev) => prev.filter((r) => r.summary.id !== id))
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-8">
-      <h1 className="text-xl font-semibold text-[var(--color-text)]">Past Runs</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-[var(--color-text)]">Past Runs</h1>
+        {runs.length > 0 && (
+          <button
+            type="button"
+            onClick={handleClearHistory}
+            className="rounded border border-[var(--color-status-failed)] px-3 py-1.5 font-mono text-xs font-medium text-[var(--color-status-failed)] hover:bg-[#FDECEA]"
+          >
+            Clear History
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="Total runs" value={total ? String(total) : '-'} />
@@ -102,6 +126,7 @@ export default function PastRuns() {
               <th className="px-4 py-2.5">Confidence</th>
               <th className="px-4 py-2.5">Mutations</th>
               <th className="px-4 py-2.5">Started</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -128,12 +153,21 @@ export default function PastRuns() {
                 <td className="px-4 py-2.5 font-mono text-xs text-[var(--color-text-muted)]">
                   {r.summary.startedAt ? dayjs(r.summary.startedAt).format('MMM D, HH:mm') : '—'}
                 </td>
+                <td className="px-4 py-2.5 text-right">
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteRun(e, r.summary.id)}
+                    className="font-mono text-xs text-[var(--color-status-failed)] opacity-80 hover:opacity-100 hover:underline"
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
-                  No results.
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--color-text-muted)]">
+                  No past runs found.
                 </td>
               </tr>
             )}
