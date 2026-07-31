@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     GEMINI_AGENT_DELAY_SECONDS: float = 2.0
     GEMINI_RATE_LIMIT_COOLDOWN_SECONDS: float = 60.0
 
+    # --- TEMPORARY DEBUG HOOK — REMOVE BEFORE DEMO ---
+    # Forces specific recovery-policy scenarios to occur on every run, for
+    # manually verifying the frontend against paths that don't occur
+    # naturally in local (no-Gemini-key) fallback mode.
+    # Supported values: "" (off, default), "missing_repo", "timeout".
+    DEBUG_FORCE_SCENARIO: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,

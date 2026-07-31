@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 import {
   ReactFlow,
   Background,
@@ -8,6 +8,7 @@ import {
   useEdgesState,
   type Edge,
   type Node,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { Workflow } from '../../types/workflow'
@@ -79,11 +80,12 @@ export default function WorkflowCanvas({ workflow, className }: { workflow: Work
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const rfInstance = useRef<ReactFlowInstance | null>(null)
 
   // Sync state whenever the execution workflow state updates
   useEffect(() => {
     const { nodes: updatedNodes, edges: updatedEdges } = computeProgressiveLayout(workflow)
-    
+
     // Preserve user-dragged node positions if node already exists
     setNodes((existingNodes) => {
       const existingPosMap = new Map(existingNodes.map((n) => [n.id, n.position]))
@@ -95,9 +97,35 @@ export default function WorkflowCanvas({ workflow, className }: { workflow: Work
         return newN
       })
     })
-    
+
     setEdges(updatedEdges)
   }, [workflow, setNodes, setEdges])
+
+  // Recenter on the newly active node (fires on every agent_started, including
+  // nodes a policy inserts mid-run) — kept to a primitive dependency so it
+  // doesn't refire on every unrelated event.
+  useEffect(() => {
+    const instance = rfInstance.current
+    if (!instance || !workflow.current_node) return
+    instance.fitView({ nodes: [{ id: workflow.current_node }], duration: 500, padding: 0.6, maxZoom: 0.9 })
+  }, [workflow.current_node])
+
+  // Once the whole workflow is done, zoom back out to show the full chain
+  // instead of staying centered on the last active node.
+  const isFinished = useMemo(
+    () =>
+      workflow.nodes.length > 0 &&
+      workflow.nodes.every(
+        (n) => n.status === 'completed' || n.status === 'failed' || n.status === 'skipped',
+      ),
+    [workflow.nodes],
+  )
+
+  useEffect(() => {
+    const instance = rfInstance.current
+    if (!instance || !isFinished) return
+    instance.fitView({ duration: 600, padding: 0.5, maxZoom: 0.75 })
+  }, [isFinished])
 
   return (
     <div className={className ?? 'h-full w-full'}>
@@ -108,6 +136,9 @@ export default function WorkflowCanvas({ workflow, className }: { workflow: Work
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onInit={(instance) => {
+          rfInstance.current = instance
+        }}
         fitView
         fitViewOptions={{ maxZoom: 0.75, padding: 0.5 }}
         minZoom={0.2}

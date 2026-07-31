@@ -7,6 +7,7 @@ from agents.base_agent import BaseAgent
 from agents.context_utils import (
     excerpt, parse_field, parse_float, parse_int, parse_list_field,
 )
+from config import settings
 from models.agent_result import AgentResult
 from models.node import WorkflowNode
 from services.gemini_client import GeminiClient, GeminiRateLimitError
@@ -132,6 +133,14 @@ def _local_research(
     rate_limited: bool,
 ) -> AgentResult:
     note = " Rate-limited — using task description and domain context only." if rate_limited else ""
+
+    # --- TEMPORARY DEBUG HOOK — REMOVE BEFORE DEMO ---
+    # Forces repository_found=False so MissingRepoPolicy can be exercised
+    # end-to-end through the real app instead of only via unit tests.
+    forced_repository_found = (
+        False if settings.DEBUG_FORCE_SCENARIO == "missing_repo" else True
+    )
+
     raw = (
         f"SUMMARY: Research conducted for {domain} task: {task}.{note} "
         "Findings are based on domain knowledge without live source retrieval.\n"
@@ -160,6 +169,7 @@ def _local_research(
             "domain": domain,
             "sources": 1,
             "contradiction_score": 0.0,
+            "repository_found": forced_repository_found,
             "facts": [f"The task pertains to the {domain} domain."],
             "assumptions": ["Task description is complete and unambiguous."],
             "unknowns": ["Specific constraints or edge cases not stated."],

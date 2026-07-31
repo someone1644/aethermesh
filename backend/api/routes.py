@@ -43,13 +43,20 @@ _running_states: dict[str, ExecutionState] = {}
 
 
 def _build_policy_engine() -> PolicyEngine:
+    # --- TEMPORARY DEBUG HOOK — REMOVE BEFORE DEMO ---
+    # Forces ExecutionTimeoutPolicy to trip on (almost) every run by
+    # dropping its threshold near zero, instead of making a step sleep
+    # past the real 30s default — same visible outcome, far less waiting.
+    timeout_seconds = (
+        0.001 if settings.DEBUG_FORCE_SCENARIO == "timeout" else None
+    )
     return PolicyEngine(
         policies=[
             LowConfidencePolicy(),
             MissingRepoPolicy(),
             ContradictionPolicy(),
             LowSourcesPolicy(),
-            ExecutionTimeoutPolicy(),
+            ExecutionTimeoutPolicy(timeout_seconds=timeout_seconds),
         ]
     )
 

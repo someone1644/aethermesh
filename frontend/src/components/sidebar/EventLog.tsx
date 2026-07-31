@@ -51,51 +51,66 @@ export default function EventLog({ events }: { events: RuntimeEvent[] }) {
   const peekEvents = events.slice(-4)
 
   return (
-    <div className="fixed inset-x-0 bottom-0 left-56 z-10 bg-[var(--color-bg)]">
-      {/* Matches the flow diagram container's max-width + padding above so the panel's edges line up. */}
-      <div className="mx-auto max-w-7xl px-8">
-        <div className="overflow-hidden rounded-t-lg border border-b-0 border-[var(--color-border)] bg-[#111214] text-gray-100">
+    <>
+      {/* Docked bar — always mounted, even while expanded, so it keeps
+          reserving its own layout space. That keeps the parent diagram
+          wrapper's height constant, which the expanded overlay below
+          depends on to inset its bottom edge correctly. */}
+      <div className="overflow-hidden rounded-t-lg border border-b-0 border-[var(--color-border)] bg-[#111214] text-gray-100">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-wide text-gray-300 hover:bg-white/5"
+        >
+          <span>event log · {events.length}</span>
+          <span aria-hidden="true">⌃</span>
+        </button>
+        <div className="h-28 overflow-hidden border-t border-white/10 px-4 py-2 font-mono text-xs leading-relaxed">
+          {peekEvents.length === 0 && <div className="text-gray-500">waiting for events…</div>}
+          {peekEvents.map((e) => (
+            <LogLine key={e.id} event={e} />
+          ))}
+        </div>
+      </div>
+
+      {/* Expanded overlay — absolutely positioned against the diagram
+          wrapper (the nearest `relative` ancestor, set up in Run.tsx),
+          covering it completely. Bottom is inset 16px to match the docked
+          bar's own bottom margin instead of sitting flush against the
+          container edge. */}
+      {expanded && (
+        <div className="absolute inset-x-0 top-0 bottom-4 z-20 flex flex-col overflow-hidden rounded-t-lg border border-b-0 border-[var(--color-border)] bg-[#111214] text-gray-100">
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-wide text-gray-300 hover:bg-white/5"
+            onClick={() => setExpanded(false)}
+            className="flex w-full shrink-0 items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-wide text-gray-300 hover:bg-white/5"
           >
             <span>event log · {events.length}</span>
-            <span aria-hidden="true">{expanded ? '⌄' : '⌃'}</span>
+            <span aria-hidden="true">⌄</span>
           </button>
-
-          {expanded ? (
-            <div className="relative">
-              <div
-                ref={scrollRef}
-                onScroll={handleScroll}
-                className="h-[380px] overflow-y-auto border-t border-white/10 px-4 py-2 font-mono text-xs leading-relaxed"
-              >
-                {events.length === 0 && <div className="text-gray-500">waiting for events…</div>}
-                {events.map((e) => (
-                  <LogLine key={e.id} event={e} />
-                ))}
-              </div>
-              {!autoScroll && (
-                <button
-                  type="button"
-                  onClick={jumpToLatest}
-                  className="absolute bottom-3 right-4 rounded-full bg-white/10 px-3 py-1 text-[10px] text-gray-200 hover:bg-white/20"
-                >
-                  jump to latest ↓
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="h-28 overflow-hidden border-t border-white/10 px-4 py-2 font-mono text-xs leading-relaxed">
-              {peekEvents.length === 0 && <div className="text-gray-500">waiting for events…</div>}
-              {peekEvents.map((e) => (
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="h-full overflow-y-auto border-t border-white/10 px-4 py-2 font-mono text-xs leading-relaxed"
+            >
+              {events.length === 0 && <div className="text-gray-500">waiting for events…</div>}
+              {events.map((e) => (
                 <LogLine key={e.id} event={e} />
               ))}
             </div>
-          )}
+            {!autoScroll && (
+              <button
+                type="button"
+                onClick={jumpToLatest}
+                className="absolute bottom-3 right-4 rounded-full bg-white/10 px-3 py-1 text-[10px] text-gray-200 hover:bg-white/20"
+              >
+                jump to latest ↓
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }

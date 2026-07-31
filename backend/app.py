@@ -8,6 +8,13 @@ from config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"Starting {settings.APP_NAME}")
+    if settings.DEBUG_FORCE_SCENARIO:
+        print(
+            "!" * 70
+            + f"\nDEBUG SCENARIO FORCING ACTIVE: {settings.DEBUG_FORCE_SCENARIO}"
+            " — remove before demo\n"
+            + "!" * 70
+        )
     yield
     print("Shutting down...")
 
