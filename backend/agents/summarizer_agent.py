@@ -27,6 +27,8 @@ class SummarizerAgent(BaseAgent):
         context_block = format_shared_context(shared)
         context_excerpt = excerpt(context_block, max_chars=1200)
 
+        conf_score = round(min(0.95, max(0.74, 0.82 + min(0.12, len(context_excerpt) / 1000.0))), 2)
+
         raw = (
             "ARTIFACT_TYPE: executive_summary\n"
             f"DOMAIN: {domain}\n\n"

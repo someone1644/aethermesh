@@ -26,6 +26,8 @@ class AnalystAgent(BaseAgent):
         plan_excerpt = excerpt(shared.get("planner", ""), max_chars=600)
         research_excerpt = excerpt(shared.get("researcher", ""), max_chars=600)
 
+        conf_score = round(min(0.96, max(0.72, 0.82 + (0.05 if plan_excerpt else 0) + (0.05 if research_excerpt else 0))), 2)
+
         raw = (
             "ARTIFACT_TYPE: strategic_analysis\n"
             f"DOMAIN: {domain}\n\n"
