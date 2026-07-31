@@ -79,7 +79,7 @@ export default function Prompt() {
           <button
             key={s}
             type="button"
-            onClick={() => start(s)}
+            onClick={() => setTask(s)}
             disabled={isLive}
             className="rounded-lg border border-[var(--color-border)] px-3.5 py-3.5 text-left text-xs text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-40"
           >
