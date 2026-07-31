@@ -20,6 +20,7 @@ const ROLE_SUBTITLES: Record<string, string> = {
   sandbox_runner: 'Verifies sandbox execution',
   analyst: 'Evaluates risks & trade-offs',
   summarizer: 'Synthesizes executive report',
+  critic: 'Challenges assumptions & hallucinations',
 }
 
 const STATUS_BADGES: Record<NodeStatus, { text: string; bg: string; border: string; label: string }> = {

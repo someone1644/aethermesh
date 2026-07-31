@@ -26,6 +26,7 @@ _KNOWN_AGENT_TYPES = [
     "sandbox_runner",
     "summarizer",
     "analyst",
+    "critic",
 ]
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,7 @@ Guidelines:
   * For security, vulnerability, IAM, S3, or audit tasks: include "security_auditor" and "sandbox_runner".
   * For performance, concurrency, memory leak, or goroutine tasks: include "optimizer" and "sandbox_runner".
   * For risk evaluation, business strategy, or trade-off analysis: include "analyst" and "summarizer".
+  * For challenging assumptions, hallucination detection, or adversarial audits: include "critic".
   * For code implementation tasks: include "coder" and "sandbox_runner".
 - Include a "reviewer" node to quality-check the output.
 - End with an "evaluator" node to score the final result.
@@ -239,6 +241,8 @@ class WorkflowGenerator:
             WorkflowNode(name="Researcher", agent_type="researcher", metadata=dict(base_meta)),
         ]
 
+        is_critic = any(k in task_lower for k in ["challenge", "critic", "hallucination", "assumption", "probe"])
+
         if is_security:
             nodes.append(WorkflowNode(name="Security Auditor", agent_type="security_auditor", metadata=dict(base_meta)))
             nodes.append(WorkflowNode(name="Coder", agent_type="coder", metadata=dict(base_meta)))
@@ -252,6 +256,9 @@ class WorkflowGenerator:
             nodes.append(WorkflowNode(name="Summarizer", agent_type="summarizer", metadata=dict(base_meta)))
         else:
             nodes.append(WorkflowNode(name="Coder", agent_type="coder", metadata=dict(base_meta)))
+
+        if is_critic:
+            nodes.append(WorkflowNode(name="Critic", agent_type="critic", metadata=dict(base_meta)))
 
         nodes.extend([
             WorkflowNode(name="Reviewer", agent_type="reviewer", metadata=dict(base_meta)),
