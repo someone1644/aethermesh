@@ -6,7 +6,7 @@ from policies.base_policy import BasePolicy
 from models.execution import ExecutionState
 from models.runtime_decision import RuntimeDecision, DecisionAction
 
-DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_TIMEOUT_SECONDS = 120.0
 
 
 class ExecutionTimeoutPolicy(BasePolicy):
